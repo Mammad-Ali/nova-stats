@@ -181,8 +181,12 @@ struct MemoryPage: View {
                 .card(.leading)
             }
             .frame(height: 230)
-            ChartCard(series: [Series(color: Nova.sun, values: m.history.memory)],
-                      legend: [(Nova.sun, "Used")], maxValue: 1, format: formatPercent)
+            HStack(spacing: 16) {
+                ChartCard(series: [Series(color: Nova.sun, values: m.history.memory)],
+                          legend: [(Nova.sun, "Used")], maxValue: 1, format: formatPercent)
+                AppsCard()
+                    .frame(width: 380)
+            }
         }
     }
 }
@@ -227,8 +231,12 @@ struct DiskPage: View {
                 ], columns: 4)
             }
             .frame(height: 230)
-            ChartCard(series: [Series(color: Nova.down, values: m.history.read), Series(color: Nova.up, values: m.history.write)],
-                      legend: [(Nova.down, "Read"), (Nova.up, "Write")], format: formatRate)
+            HStack(spacing: 16) {
+                ChartCard(series: [Series(color: Nova.down, values: m.history.read), Series(color: Nova.up, values: m.history.write)],
+                          legend: [(Nova.down, "Read"), (Nova.up, "Write")], format: formatRate)
+                DrivesCard()
+                    .frame(width: 380)
+            }
         }
     }
 }
@@ -276,7 +284,7 @@ struct SensorsPage: View {
                     ("Fans", t.hasFans ? t.fans.map { "\(Int($0)) rpm" }.joined(separator: " · ") : "Fanless", Nova.textHi),
                 ], columns: 3)
                 ChartCard(title: "CPU and GPU", series: [Series(color: Nova.sun, values: m.history.cpuTemp), Series(color: Nova.up, values: m.history.gpuTemp)],
-                          legend: [(Nova.sun, "CPU"), (Nova.up, "GPU")], maxValue: 110, format: { "\(Int($0))°" })
+                          legend: [(Nova.sun, "CPU"), (Nova.up, "GPU")], maxValue: 110, format: { formatTemp($0) })
             }
             .frame(height: 230)
             VStack(alignment: .leading, spacing: 14) {
@@ -303,5 +311,132 @@ struct SensorsPage: View {
             }
             .card()
         }
+    }
+}
+
+struct DrivesCard: View {
+    @Environment(Monitor.self) private var m
+    @State private var problem: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            CardHeader(icon: "externaldrive", title: "Drives") {
+                Chip(text: "\(m.disk.volumes.count)")
+            }
+            ScrollView {
+                VStack(spacing: 14) {
+                    ForEach(m.disk.volumes) { volume in
+                        HStack(spacing: 10) {
+                            Image(nsImage: AppIcons.icon(volume.path))
+                                .resizable()
+                                .frame(width: 28, height: 28)
+                            VStack(alignment: .leading, spacing: 5) {
+                                HStack {
+                                    Text(volume.name)
+                                        .font(.system(size: 13, weight: .medium))
+                                        .foregroundStyle(Nova.textHi)
+                                        .lineLimit(1)
+                                    Spacer(minLength: 8)
+                                    Text("\(formatBytes(volume.free)) free")
+                                        .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                                        .foregroundStyle(Nova.textMid)
+                                }
+                                Meter(value: volume.fraction, height: 3)
+                            }
+                            if volume.ejectable {
+                                Button {
+                                    eject(volume)
+                                } label: {
+                                    Image(systemName: "eject.fill")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundStyle(Nova.textMid)
+                                        .frame(width: 26, height: 26)
+                                        .background(Circle().fill(.white.opacity(0.08)))
+                                }
+                                .buttonStyle(.plain)
+                                .help("Eject \(volume.name)")
+                            }
+                        }
+                    }
+                }
+            }
+            .scrollIndicators(.never)
+            if let problem {
+                Text(problem)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Nova.amber)
+            }
+        }
+        .card()
+    }
+
+    private func eject(_ volume: Volume) {
+        problem = nil
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                try NSWorkspace.shared.unmountAndEjectDevice(at: URL(fileURLWithPath: volume.path))
+            } catch {
+                DispatchQueue.main.async { problem = "Couldn't eject \(volume.name). An app may still be using it." }
+            }
+        }
+    }
+}
+
+struct BatteryPage: View {
+    @Environment(Monitor.self) private var m
+
+    var body: some View {
+        let b = m.battery
+        VStack(spacing: 16) {
+            HStack(spacing: 16) {
+                if b.present {
+                    BigGauge(value: b.percent, caption: status(b))
+                } else {
+                    VStack(spacing: 6) {
+                        Text(b.systemWatts.map(formatWatts) ?? "—")
+                            .font(.system(size: 36, weight: .semibold).monospacedDigit())
+                            .foregroundStyle(Nova.textHi)
+                        Text("whole Mac")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(Nova.textLo)
+                    }
+                    .card(.center)
+                    .frame(width: 230)
+                }
+                StatGrid(stats: stats(b), columns: 3)
+            }
+            .frame(height: 230)
+            ChartCard(title: "Power", series: [Series(color: Nova.sun, values: m.history.power)],
+                      legend: [(Nova.sun, "Whole Mac")], format: formatWatts)
+        }
+    }
+
+    private func status(_ b: BatterySample) -> String {
+        if b.full { return "charged" }
+        if b.charging { return "charging" }
+        return b.pluggedIn ? "plugged in" : "on battery"
+    }
+
+    private func stats(_ b: BatterySample) -> [(String, String, Color)] {
+        var list: [(String, String, Color)] = [
+            ("Whole Mac uses", b.systemWatts.map(formatWatts) ?? "—", Nova.textHi),
+        ]
+        guard b.present else {
+            list.append(("Battery", "This Mac has none", Nova.textMid))
+            return list
+        }
+        let healthColor = (b.health ?? 1) >= 0.8 ? Nova.green : (b.health ?? 1) >= 0.6 ? Nova.amber : Nova.red
+        let flow = b.batteryWatts > 0.05 ? "+" + formatWatts(b.batteryWatts) : formatWatts(b.batteryWatts)
+        list += [
+            (b.charging ? "Into the battery" : "From the battery", flow, b.batteryWatts > 0.05 ? Nova.green : Nova.textHi),
+            (b.charging ? "Full in" : "Time left", b.full ? "Charged" : b.minutesLeft.map(formatMinutes) ?? "Working it out", Nova.textHi),
+            ("Health", b.health.map(formatPercent) ?? "—", healthColor),
+            ("Charge cycles", "\(b.cycles)", Nova.textHi),
+            ("Capacity", b.fullCapacity > 0 ? "\(b.fullCapacity) of \(b.designCapacity) mAh" : "—", Nova.textHi),
+            ("Charger", b.pluggedIn ? (b.adapter ?? "Plugged in") : "Not plugged in", Nova.textHi),
+            ("Charger gives", b.chargerWatts.map(formatWatts) ?? "—", Nova.textHi),
+            ("Temperature", formatTemp(m.temps.battery), Nova.heat(m.temps.battery)),
+        ]
+        return list
     }
 }

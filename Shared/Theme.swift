@@ -24,10 +24,6 @@ enum Nova {
     static let textMid = Color(hex: 0xF5F6FA, alpha: 0.7)
     static let textLo = Color(hex: 0xF5F6FA, alpha: 0.4)
 
-    static let heading = LinearGradient(
-        colors: [Color(hex: 0x4F46E5), Color(hex: 0x9333EA), Color(hex: 0xDB2777)],
-        startPoint: .topLeading, endPoint: .bottomTrailing)
-
     static func heat(_ t: Double?) -> Color {
         guard let t else { return textLo }
         return t < 60 ? green : t < 80 ? amber : red

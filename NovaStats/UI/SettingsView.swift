@@ -3,7 +3,7 @@ import ServiceManagement
 import UserNotifications
 
 enum SettingsSection: String, CaseIterable {
-    case general, menuBar, hud, alerts
+    case general, menuBar, hud, alerts, about
 
     var title: String {
         switch self {
@@ -11,19 +11,20 @@ enum SettingsSection: String, CaseIterable {
         case .menuBar: "Menu bar"
         case .hud: "HUD"
         case .alerts: "Alerts"
+        case .about: "About"
         }
     }
 }
 
 struct SettingsView: View {
-    @State private var section = SettingsSection.general
+    @State var section: SettingsSection
     @State private var prefs = Prefs.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             Text("Settings")
                 .font(.system(size: 26, weight: .bold))
-                .foregroundStyle(Nova.heading)
+                .foregroundStyle(Nova.sun)
             PillPicker(options: SettingsSection.allCases, label: \.title, selection: $section)
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
@@ -32,6 +33,7 @@ struct SettingsView: View {
                     case .menuBar: menuBar
                     case .hud: hud
                     case .alerts: AlertSettings(prefs: prefs)
+                    case .about: AboutSection()
                     }
                 }
                 .padding(.bottom, 24)
@@ -42,7 +44,7 @@ struct SettingsView: View {
         }
         .padding(.horizontal, 24)
         .padding(.top, 14)
-        .frame(width: 620, height: 600, alignment: .topLeading)
+        .frame(width: 620, height: 620, alignment: .topLeading)
         .background(.black)
         .environment(\.colorScheme, .dark)
     }
@@ -54,6 +56,21 @@ struct SettingsView: View {
                 SwitchRow(title: "Open the dashboard at launch", isOn: $prefs.openOnLaunch)
                 SwitchRow(title: "Moving stars", subtitle: "Nova's 3D starfield behind the dashboard. Off saves a bit of battery.",
                           isOn: $prefs.starfield)
+            }
+            SectionTitle("Units")
+            Rows {
+                LabeledRow(title: "Temperature") {
+                    PillPicker(options: [false, true], label: { $0 ? "°F" : "°C" }, selection: $prefs.fahrenheit, small: true)
+                }
+            }
+            SectionTitle("Shortcuts")
+            Rows {
+                LabeledRow(title: "Open or close the dashboard") {
+                    ShortcutField(shortcut: $prefs.dashboardShortcut)
+                }
+                LabeledRow(title: "Show or hide the HUD") {
+                    ShortcutField(shortcut: $prefs.hudShortcut)
+                }
             }
             SectionTitle("App")
             Rows {
@@ -71,6 +88,8 @@ struct SettingsView: View {
             Rows {
                 SwitchRow(title: "Show in menu bar", subtitle: "Live numbers next to the clock. Click them for a quick panel.",
                           isOn: $prefs.showMenuBar)
+                SwitchRow(title: "CPU graph", subtitle: "A tiny live chart of the last 12 seconds before the numbers.",
+                          isOn: $prefs.menuBarGraph)
             }
             SectionTitle("Shows")
             MetricPicker(selection: $prefs.menuBarItems)
@@ -103,17 +122,6 @@ struct SettingsView: View {
                 LabeledRow(title: "Layout") {
                     PillPicker(options: HUDLayout.allCases, label: \.title, selection: $prefs.hudLayout, small: true)
                 }
-                LabeledRow(title: "Background") {
-                    HStack(spacing: 10) {
-                        Slider(value: $prefs.hudOpacity, in: 0.3...1)
-                            .tint(Nova.sun)
-                            .frame(width: 180)
-                        Text(formatPercent(prefs.hudOpacity))
-                            .font(.system(size: 12, weight: .semibold).monospacedDigit())
-                            .foregroundStyle(Nova.textMid)
-                            .frame(width: 36, alignment: .trailing)
-                    }
-                }
             }
             SectionTitle("Shows")
             MetricPicker(selection: $prefs.hudItems)
@@ -142,10 +150,10 @@ struct AlertSettings: View {
                 .glass(16)
             }
             Rows {
-                SwitchRow(title: "Running hot", subtitle: "When the CPU stays above \(Int(prefs.alertTempLimit))° for 10 seconds.",
+                SwitchRow(title: "Running hot", subtitle: "When the CPU stays above \(formatTemp(prefs.alertTempLimit)) for 10 seconds.",
                           isOn: $prefs.alertTemp)
                 if prefs.alertTemp {
-                    SliderRow(value: $prefs.alertTempLimit, range: 70...105, step: 1, text: "\(Int(prefs.alertTempLimit))°")
+                    SliderRow(value: $prefs.alertTempLimit, range: 70...105, step: 1, text: formatTemp(prefs.alertTempLimit))
                 }
                 SwitchRow(title: "Low memory", subtitle: "When macOS says memory pressure is high.", isOn: $prefs.alertMemory)
                 SwitchRow(title: "Disk almost full", subtitle: "When less than \(Int(prefs.alertDiskLimit)) GB is free.",
@@ -285,5 +293,155 @@ struct SliderRow: View {
                 .frame(width: 52, alignment: .trailing)
         }
         .padding(.top, -6)
+    }
+}
+
+// click, then type the new key combo. esc cancels
+struct ShortcutField: View {
+    @Binding var shortcut: Shortcut?
+    @State private var recording = false
+    @State private var monitor: Any?
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Button {
+                recording ? stop() : start()
+            } label: {
+                Text(recording ? "Type a shortcut…" : shortcut?.label ?? "Off")
+                    .font(.system(size: 13, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(recording ? Color.black : .white)
+                    .frame(minWidth: 96)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(recording ? Color.white : .white.opacity(0.06)))
+                    .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(.white.opacity(recording ? 0 : 0.14)))
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Click and press the keys you want")
+
+            if shortcut != nil && !recording {
+                Button {
+                    shortcut = nil
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(Nova.textLo)
+                }
+                .buttonStyle(.plain)
+                .help("Turn this shortcut off")
+            }
+        }
+        .onDisappear { if recording { stop() } }
+    }
+
+    private func start() {
+        recording = true
+        Hotkeys.shared.pause()
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            if event.keyCode == 53 { // esc
+                stop()
+                return nil
+            }
+            let flags = event.modifierFlags.intersection([.command, .option, .control, .shift])
+            // needs at least one of control, option, command, or it would swallow normal typing
+            guard !flags.intersection([.command, .option, .control]).isEmpty else { return nil }
+            shortcut = Shortcut(keyCode: UInt32(event.keyCode), modifiers: Hotkeys.carbon(flags),
+                                label: Hotkeys.label(flags, event))
+            stop()
+            return nil
+        }
+    }
+
+    private func stop() {
+        recording = false
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
+        Hotkeys.shared.register()
+    }
+}
+
+struct AboutSection: View {
+    @State private var open: Int?
+
+    var body: some View {
+        Group {
+            HStack(spacing: 16) {
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .frame(width: 72, height: 72)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Nova Stats")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(Nova.sun)
+                    Text("Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "") · MIT license")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Nova.textMid)
+                    Text("Made by Ali Mammadli")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Nova.textLo)
+                }
+                Spacer()
+            }
+            Text(Help.about)
+                .font(.system(size: 13))
+                .foregroundStyle(Nova.textMid)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 10) {
+                Button("Website") { NSWorkspace.shared.open(Help.website) }
+                    .buttonStyle(OutlineButton())
+                Button("Source code") { NSWorkspace.shared.open(Help.source) }
+                    .buttonStyle(OutlineButton())
+                Button("License") { NSWorkspace.shared.open(Help.license) }
+                    .buttonStyle(OutlineButton())
+                Button("Report a problem") { NSWorkspace.shared.open(Help.issues) }
+                    .buttonStyle(OutlineButton())
+            }
+            SectionTitle("Questions")
+            VStack(spacing: 0) {
+                ForEach(Help.questions.indices, id: \.self) { i in
+                    Question(title: Help.questions[i].0, answer: Help.questions[i].1, open: open == i) {
+                        withAnimation(.easeOut(duration: 0.2)) { open = open == i ? nil : i }
+                    }
+                    if i < Help.questions.count - 1 {
+                        Rectangle().fill(.white.opacity(0.07)).frame(height: 1)
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .glass(16)
+        }
+    }
+}
+
+struct Question: View {
+    var title: String
+    var answer: String
+    var open: Bool
+    var toggle: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button(action: toggle) {
+                HStack {
+                    Text(title)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.white)
+                    Spacer()
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Nova.textLo)
+                        .rotationEffect(.degrees(open ? 180 : 0))
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            if open {
+                Text(answer)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Nova.textMid)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.vertical, 13)
     }
 }

@@ -10,6 +10,7 @@ extension View {
 
 struct OverviewPage: View {
     @Environment(Monitor.self) private var m
+    var open: (Tab) -> Void
 
     var body: some View {
         VStack(spacing: 16) {
@@ -19,23 +20,46 @@ struct OverviewPage: View {
                           history: m.history.cpu) {
                     Chip(text: formatTemp(m.temps.cpu), color: Nova.heat(m.temps.cpu))
                 }
+                .opens { open(.cpu) }
                 GaugeCard(icon: "square.stack.3d.up", title: "GPU", value: m.gpu.usage,
                           detail: "\(formatMemory(m.gpu.memory)) in use",
                           history: m.history.gpu) {
                     Chip(text: formatTemp(m.temps.gpu), color: Nova.heat(m.temps.gpu))
                 }
+                .opens { open(.gpu) }
                 GaugeCard(icon: "memorychip", title: "Memory", value: m.memory.fraction,
                           detail: "\(formatMemory(m.memory.used)) of \(formatMemory(m.memory.total))",
                           history: m.history.memory) {
                     PressureChip(level: m.memory.pressure)
                 }
+                .opens { open(.memory) }
             }
             HStack(spacing: 16) {
-                NetworkCard()
-                DiskCard()
-                TempsCard()
+                NetworkCard().opens { open(.network) }
+                DiskCard().opens { open(.disk) }
+                TempsCard().opens { open(.sensors) }
             }
         }
+    }
+}
+
+// a whole card you can click to open its tab
+struct Opens: ViewModifier {
+    var action: () -> Void
+    @State private var hovered = false
+
+    func body(content: Content) -> some View {
+        content
+            .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(.white.opacity(hovered ? 0.16 : 0)))
+            .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .onTapGesture(perform: action)
+            .onHover { hovered = $0 }
+    }
+}
+
+extension View {
+    func opens(_ action: @escaping () -> Void) -> some View {
+        modifier(Opens(action: action))
     }
 }
 

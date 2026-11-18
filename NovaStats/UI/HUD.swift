@@ -12,6 +12,8 @@ extension Monitor {
         case .download: compact ? formatRateShort(net.down) : formatRate(net.down)
         case .upload: compact ? formatRateShort(net.up) : formatRate(net.up)
         case .diskFree: formatBytes(disk.free)
+        case .battery: battery.present ? formatPercent(battery.percent) : "—"
+        case .power: battery.systemWatts.map(formatWatts) ?? "—"
         }
     }
 
@@ -32,6 +34,8 @@ func valueWidth(_ metric: Metric) -> CGFloat {
     case .cpuTemp, .gpuTemp, .ssdTemp: 28
     case .download, .upload: 66
     case .diskFree: 56
+    case .battery: 34
+    case .power: 46
     }
 }
 
@@ -112,10 +116,15 @@ struct HUDView: View {
                 }
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(.black.opacity(prefs.hudOpacity)))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(.white.opacity(0.12)))
+        .padding(.horizontal, 6)
+        .padding(.vertical, 4)
+        // no box behind it: a thin dark outline round every letter keeps it
+        // readable over any window, like a game's fps counter
+        .shadow(color: .black, radius: 0, x: 1, y: 0)
+        .shadow(color: .black, radius: 0, x: -1, y: 0)
+        .shadow(color: .black, radius: 0, x: 0, y: 1)
+        .shadow(color: .black, radius: 0, x: 0, y: -1)
+        .shadow(color: .black.opacity(0.7), radius: 3)
         .fixedSize()
         .onGeometryChange(for: CGSize.self) { $0.size } action: { onResize($0) }
         .environment(\.colorScheme, .dark)
@@ -131,12 +140,12 @@ struct HUDItem: View {
             if metric.isTemp || metric == .download || metric == .upload {
                 Image(systemName: metric.icon)
                     .font(.system(size: 9, weight: .heavy))
-                    .foregroundStyle(metric == .download ? Nova.down : metric == .upload ? Nova.up : Nova.textLo)
+                    .foregroundStyle(metric == .download ? Nova.down : metric == .upload ? Nova.up : Nova.textMid)
             }
             if !metric.short.isEmpty {
                 Text(metric.short)
                     .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(Nova.textLo)
+                    .foregroundStyle(Nova.textMid)
                     .fixedSize()
             }
             Text(m.value(metric))

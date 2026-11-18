@@ -2,7 +2,7 @@ import AppKit
 import Observation
 
 enum Metric: String, CaseIterable, Identifiable {
-    case cpu, gpu, memory, cpuTemp, gpuTemp, ssdTemp, download, upload, diskFree
+    case cpu, gpu, memory, cpuTemp, gpuTemp, ssdTemp, download, upload, diskFree, battery, power
 
     var id: String { rawValue }
 
@@ -17,6 +17,8 @@ enum Metric: String, CaseIterable, Identifiable {
         case .download: "Download"
         case .upload: "Upload"
         case .diskFree: "Disk free"
+        case .battery: "Battery"
+        case .power: "Power"
         }
     }
 
@@ -27,6 +29,8 @@ enum Metric: String, CaseIterable, Identifiable {
         case .memory: "RAM"
         case .ssdTemp: "SSD"
         case .diskFree: "DISK"
+        case .battery: "BAT"
+        case .power: "PWR"
         case .download, .upload: ""
         }
     }
@@ -40,10 +44,22 @@ enum Metric: String, CaseIterable, Identifiable {
         case .download: "arrow.down"
         case .upload: "arrow.up"
         case .diskFree: "internaldrive"
+        case .battery: "battery.75percent"
+        case .power: "bolt.fill"
         }
     }
 
     var isTemp: Bool { self == .cpuTemp || self == .gpuTemp || self == .ssdTemp }
+}
+
+// a global key combo, in the carbon form RegisterEventHotKey wants
+struct Shortcut: Codable, Equatable {
+    var keyCode: UInt32
+    var modifiers: UInt32
+    var label: String
+
+    static let dashboard = Shortcut(keyCode: 45, modifiers: 4096 | 2048, label: "⌃⌥N") // control option N
+    static let hud = Shortcut(keyCode: 4, modifiers: 4096 | 2048, label: "⌃⌥H")
 }
 
 enum Corner: String, CaseIterable {
@@ -88,12 +104,22 @@ final class Prefs {
         }
     }
     var menuBarItems: [Metric] { didSet { save(menuBarItems, "menuBarItems") } }
+    var menuBarGraph: Bool { didSet { d.set(menuBarGraph, forKey: "menuBarGraph") } }
+
+    var fahrenheit: Bool {
+        didSet {
+            d.set(fahrenheit, forKey: "fahrenheit")
+            TempUnit.fahrenheit = fahrenheit
+        }
+    }
+
+    var dashboardShortcut: Shortcut? { didSet { saveShortcut(dashboardShortcut, "dashboardShortcut") } }
+    var hudShortcut: Shortcut? { didSet { saveShortcut(hudShortcut, "hudShortcut") } }
 
     var showHUD: Bool { didSet { d.set(showHUD, forKey: "showHUD"); HUDController.shared.refresh() } }
     var hudItems: [Metric] { didSet { save(hudItems, "hudItems"); HUDController.shared.refresh() } }
     var hudCorner: Corner { didSet { d.set(hudCorner.rawValue, forKey: "hudCorner"); HUDController.shared.refresh() } }
     var hudLayout: HUDLayout { didSet { d.set(hudLayout.rawValue, forKey: "hudLayout") } }
-    var hudOpacity: Double { didSet { d.set(hudOpacity, forKey: "hudOpacity") } }
 
     var alertTemp: Bool { didSet { d.set(alertTemp, forKey: "alertTemp"); askForAlerts() } }
     var alertTempLimit: Double { didSet { d.set(alertTempLimit, forKey: "alertTempLimit") } }
@@ -115,7 +141,8 @@ final class Prefs {
             "hudItems": ["cpu", "gpu", "memory", "cpuTemp"],
             "hudCorner": Corner.topRight.rawValue,
             "hudLayout": HUDLayout.row.rawValue,
-            "hudOpacity": 0.75,
+            "menuBarGraph": false,
+            "fahrenheit": false,
             "alertTemp": true,
             "alertTempLimit": 95.0,
             "alertMemory": true,
@@ -132,13 +159,17 @@ final class Prefs {
         hudItems = Prefs.load(d, "hudItems")
         hudCorner = Corner(rawValue: d.string(forKey: "hudCorner") ?? "") ?? .topRight
         hudLayout = HUDLayout(rawValue: d.string(forKey: "hudLayout") ?? "") ?? .row
-        hudOpacity = d.double(forKey: "hudOpacity")
+        menuBarGraph = d.bool(forKey: "menuBarGraph")
+        fahrenheit = d.bool(forKey: "fahrenheit")
+        dashboardShortcut = Prefs.loadShortcut(d, "dashboardShortcut", .dashboard)
+        hudShortcut = Prefs.loadShortcut(d, "hudShortcut", .hud)
         alertTemp = d.bool(forKey: "alertTemp")
         alertTempLimit = d.double(forKey: "alertTempLimit")
         alertMemory = d.bool(forKey: "alertMemory")
         alertDisk = d.bool(forKey: "alertDisk")
         alertDiskLimit = d.double(forKey: "alertDiskLimit")
         alertCPU = d.bool(forKey: "alertCPU")
+        TempUnit.fahrenheit = fahrenheit
     }
 
     func applyDock() {
@@ -151,6 +182,17 @@ final class Prefs {
 
     private func save(_ items: [Metric], _ key: String) {
         d.set(items.map(\.rawValue), forKey: key)
+    }
+
+    // nothing stored means the default, an empty value means switched off
+    private func saveShortcut(_ shortcut: Shortcut?, _ key: String) {
+        d.set(shortcut.flatMap { try? JSONEncoder().encode($0) } ?? Data(), forKey: key)
+        Hotkeys.shared.register()
+    }
+
+    private static func loadShortcut(_ d: UserDefaults, _ key: String, _ fallback: Shortcut) -> Shortcut? {
+        guard let data = d.data(forKey: key) else { return fallback }
+        return try? JSONDecoder().decode(Shortcut.self, from: data)
     }
 
     private static func load(_ d: UserDefaults, _ key: String) -> [Metric] {

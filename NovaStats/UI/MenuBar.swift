@@ -14,7 +14,12 @@ struct MenuBarLabel: View {
         // read the values here, not inside ForEach: reads in there happen later,
         // while rendering, and swiftui wouldn't notice they changed
         let values = items.map { monitor.value($0, compact: true) }
+        let graph = prefs.menuBarGraph ? Array(monitor.history.cpu.suffix(MiniGraph.bars)) : []
         let view = HStack(spacing: 8) {
+            if prefs.menuBarGraph {
+                MiniGraph(values: graph)
+                    .frame(width: 34, height: 16)
+            }
             ForEach(items.indices, id: \.self) { i in
                 let metric = items[i]
                 HStack(spacing: 3) {
@@ -37,6 +42,26 @@ struct MenuBarLabel: View {
     }
 }
 
+// tiny cpu history for the menu bar, drawn black so macOS can tint it
+struct MiniGraph: View {
+    static let bars = 12
+    var values: [Double]
+
+    var body: some View {
+        Canvas { ctx, size in
+            let frame = Path(roundedRect: CGRect(origin: .zero, size: size).insetBy(dx: 0.5, dy: 0.5), cornerRadius: 3)
+            ctx.stroke(frame, with: .color(.black.opacity(0.45)), lineWidth: 1)
+            let step = (size.width - 4) / CGFloat(Self.bars)
+            let start = Self.bars - values.count
+            for (i, v) in values.enumerated() {
+                let h = max((size.height - 4) * CGFloat(min(max(v, 0), 1)), 1)
+                let rect = CGRect(x: 2 + CGFloat(start + i) * step, y: size.height - 2 - h, width: step - 0.6, height: h)
+                ctx.fill(Path(rect), with: .color(.black))
+            }
+        }
+    }
+}
+
 struct MenuPanel: View {
     @Environment(Monitor.self) private var m
 
@@ -45,7 +70,7 @@ struct MenuPanel: View {
             HStack {
                 Text("Nova Stats")
                     .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(Nova.heading)
+                    .foregroundStyle(Nova.sun)
                 Spacer()
                 Text("up \(formatUptime(m.uptime))")
                     .font(.system(size: 11, weight: .medium).monospacedDigit())
@@ -80,15 +105,24 @@ struct MenuPanel: View {
                 Button {
                     Windows.shared.showDashboard()
                 } label: {
-                    Text("Open Dashboard")
+                    Text("Dashboard")
+                        .lineLimit(1)
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(OutlineButton())
 
                 Button {
+                    Prefs.shared.showHUD.toggle()
+                } label: {
+                    Image(systemName: "rectangle.topthird.inset.filled")
+                }
+                .buttonStyle(OutlineButton(active: Prefs.shared.showHUD))
+                .help(Prefs.shared.showHUD ? "Hide the HUD" : "Show the HUD")
+
+                Button {
                     Windows.shared.showSettings()
                 } label: {
-                    Image(systemName: "gearshape")
+                    Image(systemName: "slider.horizontal.3")
                 }
                 .buttonStyle(OutlineButton())
                 .help("Settings")
@@ -154,13 +188,16 @@ struct PanelTemp: View {
 
 // Nova's main button: thin white outline on black, no glow
 struct OutlineButton: ButtonStyle {
+    var active = false
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(.white)
+            .foregroundStyle(active ? Color.black : .white)
             .padding(.horizontal, 14)
             .padding(.vertical, 9)
-            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(.white.opacity(configuration.isPressed ? 0.12 : 0.0001)))
+            .background(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(active ? Color.white : .white.opacity(configuration.isPressed ? 0.12 : 0.0001)))
             .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(.white.opacity(0.55)))
             .contentShape(Rectangle())
     }

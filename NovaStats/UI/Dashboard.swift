@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum Tab: Int, CaseIterable, Identifiable {
-    case overview, cpu, gpu, memory, disk, network, sensors, apps
+    case overview, cpu, gpu, memory, disk, network, battery, sensors
 
     var id: Int { rawValue }
 
@@ -13,8 +13,8 @@ enum Tab: Int, CaseIterable, Identifiable {
         case .memory: "Memory"
         case .disk: "Disk"
         case .network: "Network"
+        case .battery: "Battery"
         case .sensors: "Sensors"
-        case .apps: "Apps"
         }
     }
 
@@ -26,15 +26,15 @@ enum Tab: Int, CaseIterable, Identifiable {
         case .memory: "memorychip"
         case .disk: "internaldrive"
         case .network: "arrow.up.arrow.down"
+        case .battery: "battery.75percent"
         case .sensors: "thermometer.medium"
-        case .apps: "list.bullet.rectangle"
         }
     }
 }
 
 struct DashboardView: View {
     @Environment(Monitor.self) private var monitor
-    @State private var tab = Tab.overview
+    @AppStorage("lastTab") private var tab = Tab.overview
     @State private var sky = Sky()
 
     var body: some View {
@@ -55,14 +55,14 @@ struct DashboardView: View {
 
                 Group {
                     switch tab {
-                    case .overview: OverviewPage()
+                    case .overview: OverviewPage { tab = $0 }
                     case .cpu: CPUPage()
                     case .gpu: GPUPage()
                     case .memory: MemoryPage()
                     case .disk: DiskPage()
                     case .network: NetworkPage()
+                    case .battery: BatteryPage()
                     case .sensors: SensorsPage()
-                    case .apps: AppsPage()
                     }
                 }
                 .padding(.horizontal, 20)
@@ -90,7 +90,7 @@ struct DashboardView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(tab == .overview ? "Nova Stats" : tab.title)
                     .font(.system(size: 30, weight: .bold))
-                    .foregroundStyle(Nova.heading)
+                    .foregroundStyle(Nova.sun)
                 Text("\(monitor.cpuReader.name) · \(monitor.cpuReader.superCores + monitor.cpuReader.efficiencyCores)-core CPU · \(monitor.gpuReader.cores)-core GPU · \(formatMemory(monitor.memory.total))")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Nova.textMid)
@@ -104,6 +104,16 @@ struct DashboardView: View {
                     .font(.system(size: 11, weight: .medium).monospacedDigit())
                     .foregroundStyle(Nova.textLo)
             }
+            HStack(spacing: 4) {
+                HeaderButton(icon: "questionmark.circle", help: "Questions and help") {
+                    Windows.shared.showSettings(.about)
+                }
+                HeaderButton(icon: "slider.horizontal.3", help: "Settings  ⌘,") {
+                    Windows.shared.showSettings()
+                }
+            }
+            .padding(.leading, 14)
+            .alignmentGuide(.lastTextBaseline) { $0[.bottom] - 4 }
         }
     }
 }
@@ -147,5 +157,28 @@ struct TabBar: View {
         .frame(height: 66)
         .background(.ultraThinMaterial.opacity(0.6), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .glass()
+    }
+}
+
+// icon button like Nova's header ones: no frame, brighter under the mouse
+struct HeaderButton: View {
+    var icon: String
+    var help: String
+    var action: () -> Void
+    @State private var hovered = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(hovered ? Nova.textHi : Nova.textMid)
+                .frame(width: 34, height: 34)
+                .background(Circle().fill(.white.opacity(hovered ? 0.08 : 0)))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovered = $0 }
+        .help(help)
+        .accessibilityLabel(help)
     }
 }

@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import Observation
 
 struct History {
@@ -13,6 +13,7 @@ struct History {
     var write: [Double] = []
     var cpuTemp: [Double] = []
     var gpuTemp: [Double] = []
+    var power: [Double] = []
 
     fileprivate static func push(_ list: inout [Double], _ value: Double) {
         list.append(value)
@@ -30,6 +31,7 @@ final class Monitor {
     var disk = DiskSample()
     var net = NetSample()
     var temps = TempSample()
+    var battery = BatterySample()
     var history = History()
     var uptime: TimeInterval = 0
     var topCPU: [AppUsage] = []
@@ -46,11 +48,19 @@ final class Monitor {
     @ObservationIgnored private let netReader = NetworkReader()
     @ObservationIgnored private let processReader = ProcessReader()
     @ObservationIgnored private var tempReader: TempReader? // made on the sampler queue
+    @ObservationIgnored private let batteryReader = BatteryReader()
+    @ObservationIgnored private var mountObservers: [NSObjectProtocol] = []
     @ObservationIgnored private let queue = DispatchQueue(label: "novastats.sampler", qos: .utility)
     @ObservationIgnored private var timer: Timer?
 
     func start() {
         guard timer == nil else { return }
+        for name in [NSWorkspace.didMountNotification, NSWorkspace.didUnmountNotification] {
+            mountObservers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                guard let self else { return }
+                queue.async { self.diskReader.refreshSoon() }
+            })
+        }
         sample()
         let t = Timer(timeInterval: 1, repeats: true) { [weak self] _ in self?.sample() }
         t.tolerance = 0.1
@@ -67,6 +77,7 @@ final class Monitor {
             let disk = diskReader.read()
             let net = netReader.read()
             let temps = tempReader?.read() ?? TempSample()
+            let battery = batteryReader.read()
             let uptime = ProcessInfo.processInfo.systemUptime
             let apps = processReader.read()
             let topCPU = Array(apps.sorted { $0.cpu > $1.cpu }.prefix(10))
@@ -79,6 +90,7 @@ final class Monitor {
                 self.disk = disk
                 self.net = net
                 self.temps = temps
+                self.battery = battery
                 self.uptime = uptime
                 self.topCPU = topCPU
                 self.topMemory = topMemory
@@ -93,6 +105,7 @@ final class Monitor {
                 History.push(&h.write, disk.write)
                 History.push(&h.cpuTemp, temps.cpu ?? 0)
                 History.push(&h.gpuTemp, temps.gpu ?? 0)
+                History.push(&h.power, battery.systemWatts ?? 0)
                 history = h
                 Alerts.shared.check(self)
                 WidgetWriter.shared.update(self)

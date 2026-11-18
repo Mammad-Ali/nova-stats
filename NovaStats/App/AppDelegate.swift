@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         prefs.applyDock()
         Monitor.shared.start()
         HUDController.shared.refresh()
+        Hotkeys.shared.register()
         UNUserNotificationCenter.current().delegate = self
         if prefs.anyAlert { Alerts.shared.requestPermission() }
         if prefs.openOnLaunch || (!prefs.showMenuBar && !prefs.showHUD) {

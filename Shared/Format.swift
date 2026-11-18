@@ -43,9 +43,28 @@ func formatShare(_ value: Double) -> String {
     return v < 10 ? String(format: "%.1f%%", v) : String(format: "%.0f%%", v)
 }
 
+// sensors give celsius, this only changes how it's shown
+enum TempUnit {
+    static var fahrenheit = false
+}
+
 func formatTemp(_ value: Double?) -> String {
     guard let value else { return "—" }
-    return "\(Int(value.rounded()))°"
+    let shown = TempUnit.fahrenheit ? value * 9 / 5 + 32 : value
+    return "\(Int(shown.rounded()))°"
+}
+
+func formatTempWithUnit(_ value: Double) -> String {
+    formatTemp(value) + (TempUnit.fahrenheit ? "F" : "C")
+}
+
+func formatWatts(_ value: Double) -> String {
+    if abs(value) < 0.05 { return "0 W" }
+    return String(format: abs(value) < 10 ? "%.1f W" : "%.0f W", value)
+}
+
+func formatMinutes(_ minutes: Int) -> String {
+    minutes >= 60 ? "\(minutes / 60)h \(minutes % 60)m" : "\(minutes)m"
 }
 
 func formatUptime(_ seconds: TimeInterval) -> String {

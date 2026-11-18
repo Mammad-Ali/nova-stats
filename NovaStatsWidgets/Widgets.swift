@@ -23,6 +23,7 @@ struct Provider: TimelineProvider {
 
     private func entry() -> Entry {
         guard let data = WidgetData.load() else { return Entry(date: .now, data: .sample, fresh: false) }
+        TempUnit.fahrenheit = data.fahrenheit ?? false
         return Entry(date: .now, data: data, fresh: Date().timeIntervalSince(data.date) < 600)
     }
 }
@@ -227,7 +228,7 @@ struct DashboardWidgetView: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("Nova Stats")
                     .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(Nova.heading)
+                    .foregroundStyle(Nova.sun)
                 Spacer()
                 Text(entry.fresh ? "\(d.chip) · \(d.date.formatted(date: .omitted, time: .shortened))" : "Not running")
                     .font(.system(size: 11, weight: .medium))

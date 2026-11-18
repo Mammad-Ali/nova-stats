@@ -20,6 +20,7 @@ struct WidgetData: Codable {
     var cpuHistory: [Double] = [] // last hour, a point a minute
     var topApp: String?
     var topAppCPU = 0.0
+    var fahrenheit: Bool?
 
     static let sample = WidgetData(
         chip: "Apple M5", cpu: 0.23, gpu: 0.12, memory: 0.56, memoryUsed: 9.6e9, memoryTotal: 17.18e9,

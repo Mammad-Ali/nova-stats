@@ -33,6 +33,7 @@ final class WidgetWriter {
         data.cpuHistory = downsample(m.history.cpu, seconds: 3600, points: 60)
         data.topApp = m.topCPU.first?.name
         data.topAppCPU = m.topCPU.first?.cpu ?? 0
+        data.fahrenheit = TempUnit.fahrenheit
 
         // macOS only allows so many widget refreshes a day, every 5 minutes is plenty
         let reload = lastReload.map { now.timeIntervalSince($0) >= 300 } ?? true

@@ -23,7 +23,7 @@ final class Alerts {
         if p.alertTemp, let t = m.temps.cpu, t >= p.alertTempLimit {
             hotSince = hotSince ?? now
             if now.timeIntervalSince(hotSince!) >= 10 {
-                send("temp", "Your Mac is running hot", "The CPU is at \(Int(t.rounded()))°C.\(culprit(m))")
+                send("temp", "Your Mac is running hot", "The CPU is at \(formatTempWithUnit(t)).\(culprit(m))")
             }
         } else {
             hotSince = nil

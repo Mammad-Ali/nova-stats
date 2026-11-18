@@ -18,11 +18,20 @@ final class Windows: NSObject, NSWindowDelegate {
         show(window)
     }
 
-    func showSettings() {
-        let window = settings ?? makeWindow(size: NSSize(width: 620, height: 600), resizable: false, name: "Settings")
+    // the shortcut opens the dashboard, or puts it away if it's already in front
+    func toggleDashboard() {
+        if let dashboard, dashboard.isVisible, dashboard.isKeyWindow, NSApp.isActive {
+            dashboard.performClose(nil)
+        } else {
+            showDashboard()
+        }
+    }
+
+    func showSettings(_ section: SettingsSection? = nil) {
+        let window = settings ?? makeWindow(size: NSSize(width: 620, height: 620), resizable: false, name: "Settings")
         settings = window
-        if !(window.contentView is NSHostingView<AnyView>) {
-            window.contentView = NSHostingView(rootView: AnyView(SettingsView().environment(Monitor.shared)))
+        if section != nil || !(window.contentView is NSHostingView<AnyView>) {
+            window.contentView = NSHostingView(rootView: AnyView(SettingsView(section: section ?? .general).environment(Monitor.shared)))
         }
         show(window)
     }
@@ -43,6 +52,7 @@ final class Windows: NSObject, NSWindowDelegate {
         window.appearance = NSAppearance(named: .darkAqua)
         window.isMovableByWindowBackground = true
         window.isReleasedWhenClosed = false
+        window.isRestorable = false // we decide what opens at launch, not macOS's resume
         window.delegate = self
         window.center()
         window.setFrameAutosaveName(name)
