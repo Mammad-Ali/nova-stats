@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nova Stats — a system monitor for the Mac</title>
+<meta name="description" content="Free, open-source system monitor for the Mac: CPU, GPU, memory, disk, network, battery and temperatures in a dashboard, the menu bar, a HUD and widgets.">
+<meta property="og:title" content="Nova Stats">
+<meta property="og:description" content="What your Mac is doing, in Nova's colors. Free and open source.">
+<meta property="og:image" content="https://mammad-ali.github.io/nova-stats/dashboard.png">
+<meta name="theme-color" content="#000000">
+<link rel="icon" type="image/png" href="icon.png">
+<style>
+  :root {
+    --sun: #FFC61A;
+    --down: #818CF8;
+    --up: #E879F9;
+    --text: #F5F6FA;
+    --mid: rgba(245, 246, 250, 0.7);
+    --lo: rgba(245, 246, 250, 0.4);
+    --glass: rgba(255, 255, 255, 0.045);
+    --line: rgba(255, 255, 255, 0.09);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: #000;
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+  }
+  #sky { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; }
+  main, nav, footer { position: relative; z-index: 1; }
+  a { color: inherit; }
+
+  nav {
+    position: sticky; top: 0;
+    display: flex; align-items: center; gap: 28px;
+    padding: 14px max(24px, calc((100% - 1080px) / 2));
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    border-bottom: 1px solid var(--line);
+    z-index: 10;
+  }
+  nav .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; color: var(--sun); text-decoration: none; margin-right: auto; }
+  nav .brand img { width: 28px; height: 28px; border-radius: 22.5%; }
+  nav a.link { color: var(--mid); text-decoration: none; font-size: 14px; font-weight: 600; }
+  nav a.link:hover { color: var(--text); }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 14px 26px; border-radius: 16px;
+    background: #fff; color: #000;
+    font-weight: 700; font-size: 16px; text-decoration: none;
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  .pill:hover { transform: translateY(-1px); box-shadow: 0 8px 30px rgba(255, 198, 26, 0.25); }
+  .pill.small { padding: 8px 16px; border-radius: 12px; font-size: 14px; }
+  .outline {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 13px 22px; border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.55); color: #fff;
+    font-weight: 600; font-size: 15px; text-decoration: none;
+  }
+  .outline:hover { background: rgba(255, 255, 255, 0.08); }
+
+  section { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  .hero { text-align: center; padding-top: 90px; }
+  /* the png is a full square, macOS rounds it in the dock, so do the same here */
+  .hero .icon {
+    width: 168px; height: 168px; border-radius: 22.5%;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 24px 70px rgba(255, 198, 26, 0.28);
+  }
+  h1 { font-size: clamp(48px, 8vw, 84px); line-height: 1; margin: 22px 0 14px; color: var(--sun); letter-spacing: -0.02em; }
+  .tagline { font-size: clamp(18px, 2.4vw, 22px); color: var(--text); margin: 0 auto 10px; max-width: 640px; }
+  .sub { color: var(--mid); max-width: 620px; margin: 0 auto 34px; }
+  .actions { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+  .fine { color: var(--lo); font-size: 13px; margin-top: 16px; }
+  .shot {
+    margin: 64px auto 0; border-radius: 18px; overflow: hidden;
+    border: 1px solid var(--line);
+    box-shadow: 0 30px 120px rgba(255, 198, 26, 0.12), 0 20px 60px rgba(0, 0, 0, 0.8);
+  }
+  .shot img { display: block; width: 100%; }
+
+  h2 { font-size: clamp(30px, 4vw, 40px); color: var(--sun); margin: 0 0 10px; letter-spacing: -0.01em; }
+  .lead { color: var(--mid); margin: 0 0 34px; max-width: 640px; }
+  .block { padding-top: 110px; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+  .card { background: var(--glass); border: 1px solid var(--line); border-radius: 22px; padding: 22px; }
+  .card h3 { margin: 12px 0 6px; font-size: 17px; }
+  .card p { margin: 0; color: var(--mid); font-size: 14.5px; }
+  .card svg { width: 26px; height: 26px; stroke: var(--sun); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+  .showcase { display: grid; grid-template-columns: 1fr 1.6fr; gap: 16px; align-items: start; }
+  .showcase .card { padding: 18px; }
+  .showcase img { display: block; width: 100%; border-radius: 14px; }
+  .caption { color: var(--lo); font-size: 13px; margin-top: 10px; text-align: center; }
+  .stack { display: grid; gap: 16px; }
+
+  .steps { counter-reset: step; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .step::before {
+    counter-increment: step; content: counter(step);
+    display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 50%;
+    background: #fff; color: #000; font-weight: 700; font-size: 14px;
+  }
+  code { background: rgba(255, 255, 255, 0.08); padding: 2px 6px; border-radius: 6px; font-size: 13px; }
+
+  .faq { background: var(--glass); border: 1px solid var(--line); border-radius: 22px; padding: 0 22px; }
+  details { border-bottom: 1px solid rgba(255, 255, 255, 0.07); }
+  details:last-child { border-bottom: none; }
+  summary {
+    list-style: none; cursor: pointer; padding: 18px 0;
+    display: flex; justify-content: space-between; align-items: center; gap: 16px;
+    font-weight: 600; font-size: 16px;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "+"; color: var(--lo); font-size: 22px; font-weight: 400; transition: transform .2s; }
+  details[open] summary::after { transform: rotate(45deg); }
+  details p { margin: 0 0 18px; color: var(--mid); }
+
+  footer {
+    margin-top: 120px; padding: 34px max(24px, calc((100% - 1080px) / 2)) 50px;
+    border-top: 1px solid var(--line);
+    display: flex; flex-wrap: wrap; gap: 14px 28px; align-items: center;
+    color: var(--lo); font-size: 14px;
+  }
+  footer .mit { margin-right: auto; }
+  footer a { color: var(--mid); text-decoration: none; }
+  footer a:hover { color: var(--text); }
+
+  @media (max-width: 760px) {
+    nav a.link { display: none; }
+    .showcase { grid-template-columns: 1fr; }
+    .hero { padding-top: 60px; }
+  }
+</style>
+</head>
+<body>
+<canvas id="sky"></canvas>
+
+<nav>
+  <a class="brand" href="#top"><img src="icon.png" alt="">Nova Stats</a>
+  <a class="link" href="#features">Features</a>
+  <a class="link" href="#install">Install</a>
+  <a class="link" href="#questions">Questions</a>
+  <a class="link" href="https://github.com/Mammad-Ali/nova-stats">GitHub</a>
+  <a class="pill small" href="https://github.com/Mammad-Ali/nova-stats/releases/latest/download/Nova-Stats.dmg">Download</a>
+</nav>
+
+<main id="top">
+  <section class="hero">
+    <img class="icon" src="icon.png" alt="The Nova Stats icon: a chip with Nova's yellow star rising from it">
+    <h1>Nova Stats</h1>
+    <p class="tagline">What your Mac is doing, in Nova's colors.</p>
+    <p class="sub">CPU, GPU, memory, disk, network, battery and temperatures, in a dashboard, the menu bar, a small HUD over your other apps and desktop widgets.</p>
+    <div class="actions">
+      <a class="pill" href="https://github.com/Mammad-Ali/nova-stats/releases/latest/download/Nova-Stats.dmg">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12M6 11l6 6 6-6M5 20h14"/></svg>
+        Download for Mac
+      </a>
+      <a class="outline" href="https://github.com/Mammad-Ali/nova-stats">Source code</a>
+    </div>
+    <p class="fine" id="fine">Free and open source · macOS 15 or newer · Apple Silicon</p>
+    <div class="shot"><img src="dashboard.png" alt="The Nova Stats dashboard: CPU, GPU and memory gauges, network and disk charts and temperatures over a dark starfield"></div>
+  </section>
+
+  <section class="block" id="features">
+    <h2>Everything at a glance</h2>
+    <p class="lead">Read straight from the chip's own counters and sensors, once a second, using about 1% of one CPU core when the window is closed.</p>
+    <div class="grid">
+      <div class="card">
+        <svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="3"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></svg>
+        <h3>CPU and GPU</h3>
+        <p>Load overall and per core, efficiency and performance cores apart, plus the GPU and the memory it uses.</p>
+      </div>
+      <div class="card">
+        <svg viewBox="0 0 24 24"><path d="M14 4v16M10 4v16M4 9h16M4 15h16"/><rect x="3" y="3" width="18" height="18" rx="4"/></svg>
+        <h3>Memory and apps</h3>
+        <p>Counted the way Activity Monitor counts it, with the apps using the most memory or CPU.</p>
+      </div>
+      <div class="card">
+        <svg viewBox="0 0 24 24"><path d="M14 3h5v5M10 21H5v-5M19 3l-6 6M5 21l6-6"/></svg>
+        <h3>Disk and drives</h3>
+        <p>Space left, read and write speed, every connected drive, and an Eject button for external ones.</p>
+      </div>
+      <div class="card">
+        <svg viewBox="0 0 24 24"><path d="M12 4v13M7 12l5 5 5-5"/><path d="M5 20h14"/></svg>
+        <h3>Network</h3>
+        <p>Download and upload speed, Wi-Fi or Ethernet, and how much went through since you switched on.</p>
+      </div>
+      <div class="card">
+        <svg viewBox="0 0 24 24"><rect x="2" y="7" width="17" height="10" rx="3"/><path d="M22 11v2M9 9l-2 3h4l-2 3"/></svg>
+        <h3>Battery and power</h3>
+        <p>Health, charge cycles, time left, the charger, and how many watts the whole Mac uses right now.</p>
+      </div>
+      <div class="card">
+        <svg viewBox="0 0 24 24"><path d="M14 14.8V4a2 2 0 1 0-4 0v10.8a4 4 0 1 0 4 0z"/></svg>
+        <h3>Temperatures</h3>
+        <p>CPU, GPU, SSD and battery, plus every other sensor the chip has. In °C or °F.</p>
+      </div>
+    </div>
+    <div class="shot" style="margin-top:16px"><img src="battery.png" alt="The Battery tab: 22% and charging, 6 W for the whole Mac, health 100%, 54 charge cycles, the charger and a power chart"></div>
+  </section>
+
+  <section class="block">
+    <h2>Wherever you look</h2>
+    <p class="lead">Use the parts you like and switch off the rest in Settings.</p>
+    <div class="showcase">
+      <div class="card">
+        <img src="menu.png" alt="The menu bar panel">
+        <p class="caption">The menu bar, with a quick panel, an optional mini CPU graph and a HUD switch</p>
+      </div>
+      <div class="stack">
+        <div class="card">
+          <img src="widgets.png" alt="The four widgets: CPU, Memory, System and Dashboard">
+          <p class="caption">Four desktop widgets</p>
+        </div>
+        <div class="card">
+          <img src="hud.png" alt="The HUD in a column: CPU, GPU, RAM, CPU temperature and power, with no box behind it" style="max-width:280px;margin:0 auto">
+          <p class="caption">The HUD floats over every app, even in full screen, with no box behind it, and clicks go right through it</p>
+        </div>
+      </div>
+    </div>
+    <div class="grid" style="margin-top:16px">
+      <div class="card">
+        <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="3"/><path d="M7 10h1M11 10h1M15 10h2M7 14h10"/></svg>
+        <h3>Shortcuts from anywhere</h3>
+        <p><code>⌃⌥N</code> opens the dashboard and <code>⌃⌥H</code> shows or hides the HUD, from any app. You can change both.</p>
+      </div>
+      <div class="card">
+        <svg viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10 21h4"/></svg>
+        <h3>Alerts</h3>
+        <p>A notification when the Mac runs hot, memory gets tight, the disk is almost full or the CPU stays busy.</p>
+      </div>
+      <div class="card">
+        <svg viewBox="0 0 24 24"><path d="M12 3l2.2 6.8L21 12l-6.8 2.2L12 21l-2.2-6.8L3 12l6.8-2.2z"/></svg>
+        <h3>Looks like Nova</h3>
+        <p>Black, white stars and one yellow accent. The same 3D starfield as <a href="https://github.com/Mammad-Ali/nova">Nova</a>, drawn on the GPU.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="install">
+    <h2>Install</h2>
+    <p class="lead">Nova Stats isn't signed with a paid Apple developer account, so macOS asks you once to allow it.</p>
+    <div class="steps">
+      <div class="card step">
+        <h3>Download</h3>
+        <p>Get <a href="https://github.com/Mammad-Ali/nova-stats/releases/latest/download/Nova-Stats.dmg">Nova-Stats.dmg</a> and open it.</p>
+      </div>
+      <div class="card step">
+        <h3>Drag to Applications</h3>
+        <p>Drag Nova Stats onto the Applications folder in the window that opens, then open it from Applications.</p>
+      </div>
+      <div class="card step">
+        <h3>Allow it once</h3>
+        <p>If macOS says it can't check the app, open System Settings → Privacy &amp; Security, scroll down and press <b>Open Anyway</b>.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="questions">
+    <h2>Questions</h2>
+    <p class="lead">The same answers are in the app, under Settings → About.</p>
+    <div class="faq">
+      <details><summary>Is Nova Stats free?</summary><p>Yes, completely. It's open source under the MIT license, so you can read the code, change it and share it.</p></details>
+      <details><summary>Why does macOS say it can't check the app?</summary><p>Apple only vouches for apps from developers who pay for a yearly account. Nova Stats isn't signed that way, so the first time macOS blocks it. Open System Settings, go to Privacy &amp; Security, scroll down and press Open Anyway. You only do this once.</p></details>
+      <details><summary>Does it send my data anywhere?</summary><p>No. Nova Stats never connects to the internet. Everything it measures stays on your Mac.</p></details>
+      <details><summary>Does it slow my Mac down?</summary><p>Barely. With the dashboard closed it uses about 1% of one CPU core. The open dashboard with moving stars uses about 7%; turn the stars off in Settings if you like.</p></details>
+      <details><summary>Where do the temperatures come from?</summary><p>Straight from the chip's own sensors (the SMC and the system's temperature sensors), the same ones macOS uses to run the fans. The CPU number is the average of the core sensors.</p></details>
+      <details><summary>Which Macs does it work on?</summary><p>Macs with Apple Silicon (M1 to M5) on macOS 15 or newer. On Intel Macs most numbers work, but some temperatures may be missing.</p></details>
+      <details><summary>Why do the widgets update only every few minutes?</summary><p>macOS decides how often widgets may refresh. For numbers that change every second, use the menu bar or the HUD.</p></details>
+      <details><summary>Why are some apps missing from the Apps list?</summary><p>Without an administrator password macOS only lets an app look at your own processes, not the system's. Everything you run yourself is there.</p></details>
+      <details><summary>Why don't alerts show up?</summary><p>macOS needs your permission for notifications. Open System Settings, then Notifications, find Nova Stats and allow them. Settings → Alerts in the app has a button that takes you there.</p></details>
+      <details><summary>How do I remove it?</summary><p>Quit it from the menu bar panel, then drag Nova Stats from Applications to the Bin. Its settings are in <code>~/Library/Preferences/com.mammadali.novastats.plist</code>.</p></details>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <span class="mit">Free and open source under the <a href="https://github.com/Mammad-Ali/nova-stats/blob/main/LICENSE">MIT license</a>. Made by Ali Mammadli.</span>
+  <a href="https://github.com/Mammad-Ali/nova-stats">Source code</a>
+  <a href="https://github.com/Mammad-Ali/nova-stats/releases">All versions</a>
+  <a href="https://github.com/Mammad-Ali/nova-stats/issues">Report a problem</a>
+  <a href="https://github.com/Mammad-Ali/nova">Nova</a>
+</footer>
+
+<script>
+// on a phone or a pc the download still works, it just won't run there
+const ua = navigator.userAgent;
+const onMac = /Macintosh|Mac OS X/.test(ua) && !/iPhone|iPad|Android/.test(ua) && navigator.maxTouchPoints < 2; // ipads say Macintosh too
+if (!onMac) {
+  document.getElementById("fine").textContent = "Nova Stats runs on a Mac with macOS 15 or newer. Free and open source.";
+}
+
+// nova's 3d sky: stars fly toward you, the camera leans to the mouse
+(function () {
+  const canvas = document.getElementById("sky");
+  const ctx = canvas.getContext("2d");
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let w = 0, h = 0, dpr = 1, lookX = 0, lookY = 0, mouseX = 0, mouseY = 0, last = 0;
+  const stars = [];
+  const star = (z) => ({
+    x: (Math.random() * 2 - 1) * 1.6,
+    y: (Math.random() * 2 - 1) * 1.1,
+    z,
+    size: Math.random() < 0.1 ? 1.6 + Math.random() * 1.2 : 0.6 + Math.random() * 0.8,
+    tw: 0.4 + Math.random() * 2,
+    ph: Math.random() * Math.PI * 2,
+  });
+  for (let i = 0; i < 420; i++) stars.push(star(0.04 + Math.random() * 0.96));
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    w = innerWidth; h = innerHeight;
+    canvas.width = w * dpr; canvas.height = h * dpr;
+  }
+  addEventListener("resize", resize);
+  addEventListener("mousemove", (e) => { mouseX = e.clientX / w * 2 - 1; mouseY = e.clientY / h * 2 - 1; });
+  resize();
+
+  function frame(t) {
+    const dt = Math.min((t - last) / 1000 || 0.016, 0.05);
+    last = t;
+    const k = 1 - Math.exp(-dt * 2.2);
+    lookX += (mouseX - lookX) * k;
+    lookY += (mouseY - lookY) * k;
+    const flight = still ? 0 : 0.06;
+    const cx = w / 2, cy = h * 0.42, focal = Math.min(w, h) * 0.55;
+    const camX = lookX * 0.22, camY = lookY * 0.14;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = "#fff";
+    for (let i = 0; i < stars.length; i++) {
+      const s = stars[i];
+      s.z -= flight * dt;
+      if (s.z <= 0.035) { stars[i] = star(1 + Math.random() * 0.04); continue; }
+      const x = cx + (s.x - camX) / s.z * focal;
+      const y = cy + (s.y - camY) / s.z * focal;
+      if (x < -40 || x > w + 40 || y < -40 || y > h + 40) continue;
+      const near = 1 - s.z;
+      const twinkle = 0.7 + 0.3 * Math.sin(t / 1000 * s.tw + s.ph);
+      const appear = Math.min(Math.max((1 - s.z) / 0.3, 0), 1);
+      ctx.globalAlpha = Math.min(Math.max((0.18 + 0.82 * near) * twinkle * appear, 0), 1);
+      const r = Math.min(Math.max(s.size * 0.16 / s.z, 0.35), 3.4);
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    if (!document.hidden) requestAnimationFrame(frame);
+  }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) { last = performance.now(); requestAnimationFrame(frame); } });
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
