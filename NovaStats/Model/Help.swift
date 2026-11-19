@@ -2,7 +2,7 @@ import Foundation
 
 // the same questions are on the website, docs/index.html
 enum Help {
-    static let about = "Nova Stats is a free, open-source system monitor for the Mac. It shows what the CPU, GPU, memory, disk, network, battery and temperatures are doing, in a dashboard, the menu bar, a small HUD over your other apps and desktop widgets. It's the sibling of Nova, the network app, and looks like it."
+    static let about = "Nova Stats is a free, open-source system monitor for the Mac. It shows what the CPU, GPU, memory, disk, network, battery and temperatures are doing, in a dashboard, the menu bar, desktop widgets and, while you play, an overlay on top of the game. It's the sibling of Nova, the network app, and looks like it."
 
     static let questions: [(String, String)] = [
         ("Is Nova Stats free?",
@@ -12,13 +12,15 @@ enum Help {
         ("Does it send my data anywhere?",
          "No. Nova Stats never connects to the internet. Everything it measures stays on your Mac."),
         ("Does it slow my Mac down?",
-         "Barely. With the dashboard closed it uses about 1% of one CPU core. The open dashboard with moving stars uses about 7%; turn the stars off in Settings if you like."),
+         "Barely. With the dashboard closed it uses about 1–2% of one CPU core: anything you can't see is measured less often. The open dashboard with moving stars uses about 7%; turn the stars off in Settings if you like."),
         ("Where do the temperatures come from?",
          "Straight from the chip's own sensors (the SMC and the system's temperature sensors), the same ones macOS uses to run the fans. The CPU number is the average of the core sensors."),
         ("Which Macs does it work on?",
          "Macs with Apple Silicon (M1 to M5) on macOS 15 or newer. On Intel Macs most numbers work, but some temperatures may be missing."),
+        ("What is game mode?",
+         "Turn it on from the menu bar or with ⌃⌥G, or let it start by itself when a game goes full screen. While it's on, an overlay shows your stats over the game and warns you if the Mac gets so hot that macOS slows it down. When you stop, you get a report: how long you played and the average and peak CPU, GPU, temperatures and power. macOS doesn't let other apps read a game's FPS, so that isn't shown."),
         ("Why do the widgets update only every few minutes?",
-         "macOS decides how often widgets may refresh. For numbers that change every second, use the menu bar or the HUD."),
+         "macOS decides how often widgets may refresh. For numbers that change every second, use the menu bar or game mode's overlay."),
         ("Why are some apps missing from the Apps list?",
          "Without an administrator password macOS only lets an app look at your own processes, not the system's. Everything you run yourself is there."),
         ("Why don't alerts show up?",

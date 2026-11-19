@@ -35,7 +35,7 @@ final class DiskReader {
         volumesTime = -100
     }
 
-    func read() -> DiskSample {
+    func read(volumes wantVolumes: Bool) -> DiskSample {
         var s = DiskSample()
         let now = ProcessInfo.processInfo.systemUptime
 
@@ -55,7 +55,8 @@ final class DiskReader {
             s.free = space.free
         }
 
-        if now - volumesTime > 5 {
+        // the drive list is only shown on the disk tab, and listing it isn't cheap
+        if wantVolumes && now - volumesTime > 10 {
             volumes = mountedVolumes()
             volumesTime = now
         }

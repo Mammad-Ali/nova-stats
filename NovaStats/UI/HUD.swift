@@ -48,7 +48,7 @@ final class HUDController {
 
     func refresh() {
         let prefs = Prefs.shared
-        guard prefs.showHUD, !prefs.hudItems.isEmpty else {
+        guard GameMode.shared.overlayVisible, !prefs.hudItems.isEmpty else {
             panel?.orderOut(nil)
             panel = nil
             return
@@ -109,10 +109,12 @@ struct HUDView: View {
             if prefs.hudLayout == .row {
                 HStack(spacing: 14) {
                     ForEach(prefs.hudItems) { HUDItem(metric: $0) }
+                    if GameMode.shared.hot { HotWarning() }
                 }
             } else {
                 VStack(alignment: .leading, spacing: 6) {
                     ForEach(prefs.hudItems) { HUDItem(metric: $0) }
+                    if GameMode.shared.hot { HotWarning() }
                 }
             }
         }
@@ -154,5 +156,19 @@ struct HUDItem: View {
                 .frame(width: valueWidth(metric), alignment: .trailing)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+// shown while macOS is holding the mac back because it's too hot
+struct HotWarning: View {
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "flame.fill")
+                .font(.system(size: 10, weight: .bold))
+            Text("HOT · slowing down")
+                .font(.system(size: 11, weight: .heavy))
+        }
+        .foregroundStyle(Nova.red)
+        .fixedSize()
     }
 }

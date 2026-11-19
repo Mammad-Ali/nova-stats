@@ -34,7 +34,7 @@ enum Tab: Int, CaseIterable, Identifiable {
 
 struct DashboardView: View {
     @Environment(Monitor.self) private var monitor
-    @AppStorage("lastTab") private var tab = Tab.overview
+    @State private var ui = UIState.shared
     @State private var sky = Sky()
 
     var body: some View {
@@ -54,8 +54,8 @@ struct DashboardView: View {
                     .padding(.bottom, 18)
 
                 Group {
-                    switch tab {
-                    case .overview: OverviewPage { tab = $0 }
+                    switch ui.tab {
+                    case .overview: OverviewPage { ui.tab = $0 }
                     case .cpu: CPUPage()
                     case .gpu: GPUPage()
                     case .memory: MemoryPage()
@@ -68,12 +68,25 @@ struct DashboardView: View {
                 .padding(.horizontal, 20)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .transition(.asymmetric(insertion: .opacity, removal: .identity))
-                .id(tab)
+                .id(ui.tab)
 
-                TabBar(selection: $tab)
+                TabBar(selection: $ui.tab)
                     .padding(.horizontal, 20)
                     .padding(.top, 16)
                     .padding(.bottom, 14)
+            }
+
+            if ui.settings != nil {
+                Color.black.opacity(0.55)
+                    .ignoresSafeArea()
+                    .onTapGesture { Windows.shared.closeSettings() }
+                    .transition(.opacity)
+                GeometryReader { geo in
+                    SettingsView(maxHeight: geo.size.height - 30)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                        .padding(.bottom, 16)
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         .onContinuousHover { phase in
@@ -82,13 +95,13 @@ struct DashboardView: View {
             case .ended: sky.cursor = nil
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: tab)
+        .animation(.easeInOut(duration: 0.2), value: ui.tab)
     }
 
     private var header: some View {
         HStack(alignment: .lastTextBaseline) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(tab == .overview ? "Nova Stats" : tab.title)
+                Text(ui.tab == .overview ? "Nova Stats" : ui.tab.title)
                     .font(.system(size: 30, weight: .bold))
                     .foregroundStyle(Nova.sun)
                 Text("\(monitor.cpuReader.name) · \(monitor.cpuReader.superCores + monitor.cpuReader.efficiencyCores)-core CPU · \(monitor.gpuReader.cores)-core GPU · \(formatMemory(monitor.memory.total))")
@@ -109,7 +122,7 @@ struct DashboardView: View {
                     Windows.shared.showSettings(.about)
                 }
                 HeaderButton(icon: "slider.horizontal.3", help: "Settings  ⌘,") {
-                    Windows.shared.showSettings()
+                    Windows.shared.toggleSettings()
                 }
             }
             .padding(.leading, 14)

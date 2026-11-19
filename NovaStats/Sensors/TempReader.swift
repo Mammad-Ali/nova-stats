@@ -46,51 +46,54 @@ final class TempReader {
         if let n = smc("FNum") { fanCount = Int(n) }
     }
 
-    func read() -> TempSample {
-        var s = TempSample()
-
+    // with only the cpu number on screen (the menu bar) just the cpu keys are
+    // read and the rest is kept from last time; the sensor list is for the sensors tab
+    func read(into s: inout TempSample, everything: Bool, list: Bool) {
         let cpu = cpuKeys.compactMap { smc($0) }.filter(sane)
-        let gpu = gpuKeys.compactMap { smc($0) }.filter(sane)
         s.cpu = average(cpu)
         s.cpuHottest = cpu.max()
+        guard everything || cpuKeys.isEmpty else { return }
+
+        let gpu = gpuKeys.compactMap { smc($0) }.filter(sane)
         s.gpu = average(gpu)
 
-        // asking hid for ~45 sensors every second is not free: the ssd and
-        // one battery sensor each time, the soc dies every 5 seconds
+        // asking hid for ~45 sensors is not free: the ssd and one battery
+        // sensor each time, all the soc dies only for the list
         let now = ProcessInfo.processInfo.systemUptime
-        let fullRead = now - diesRead >= 5 || cpuKeys.isEmpty
+        let allDies = (list && now - diesRead >= 5) || cpuKeys.isEmpty
         var hid: [(name: String, value: Double)] = []
         var batterySeen = false
         for (name, service) in services {
             let isBattery = name.contains("battery")
-            guard fullRead || name.hasPrefix("NAND") || (isBattery && !batterySeen) else { continue }
+            guard allDies || name.hasPrefix("NAND") || (isBattery && !batterySeen) else { continue }
             if isBattery { batterySeen = true }
             guard let event = IOHIDServiceClientCopyEvent(service, 15, 0, 0) else { continue }
             let value = IOHIDEventGetFloatValue(event, 15 << 16)
             if sane(value) { hid.append((name, value)) }
         }
-        if fullRead {
+        if allDies {
             dies = hid.filter { $0.name.hasPrefix("PMU") }
+                .compactMap { item in pretty(item.name).map { ($0, item.value) } }
+                .sorted { $0.0.localizedStandardCompare($1.0) == .orderedAscending }
             diesRead = now
         }
         s.ssd = average(hid.filter { $0.name.hasPrefix("NAND") }.map(\.value))
         s.battery = average(hid.filter { $0.name.contains("battery") }.map(\.value))
         if s.cpu == nil {
             // no smc keys we know, fall back to the die sensors
-            let die = dies.filter { $0.name.contains("tdie") }.map(\.value)
+            let die = dies.filter { $0.name.contains("die") }.map(\.value)
             s.cpu = average(die)
             s.cpuHottest = die.max()
         }
 
         s.hasFans = fanCount > 0
         s.fans = (0..<fanCount).compactMap { smc("F\($0)Ac") }
+        guard list else { return }
         s.sensors = cpu.enumerated().map { ("CPU \($0.offset + 1)", $0.element) }
             + gpu.enumerated().map { ("GPU \($0.offset + 1)", $0.element) }
         if let ssd = s.ssd { s.sensors.append(("SSD", ssd)) }
         if let battery = s.battery { s.sensors.append(("Battery", battery)) }
-        s.sensors += dies.compactMap { item in pretty(item.name).map { ($0, item.value) } }
-            .sorted { $0.0.localizedStandardCompare($1.0) == .orderedAscending }
-        return s
+        s.sensors += dies
     }
 
     // turns "PMU2 tdie4" into "SoC 2 die 4", drops the ones shown above

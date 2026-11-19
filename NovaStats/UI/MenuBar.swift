@@ -112,12 +112,12 @@ struct MenuPanel: View {
                 .buttonStyle(OutlineButton())
 
                 Button {
-                    Prefs.shared.showHUD.toggle()
+                    GameMode.shared.toggle()
                 } label: {
-                    Image(systemName: "rectangle.topthird.inset.filled")
+                    Image(systemName: "gamecontroller.fill")
                 }
-                .buttonStyle(OutlineButton(active: Prefs.shared.showHUD))
-                .help(Prefs.shared.showHUD ? "Hide the HUD" : "Show the HUD")
+                .buttonStyle(OutlineButton(active: GameMode.shared.active))
+                .help(GameMode.shared.active ? "Stop game mode" : "Start game mode")
 
                 Button {
                     Windows.shared.showSettings()

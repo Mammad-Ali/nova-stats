@@ -20,19 +20,24 @@ struct BatterySample {
 }
 
 final class BatteryReader {
-    // runs on the sampler queue, same as the other smc reads
-    func read() -> BatterySample {
-        var s = BatterySample()
+    // both run on the sampler queue, same as the other smc reads
+    func readPower(into s: inout BatterySample) {
         var value = 0.0
-        if smc_read("PSTR", &value) == 0, value > 0 { s.systemWatts = value }
-        if smc_read("PDTR", &value) == 0, value > 0.5 { s.chargerWatts = value }
+        s.systemWatts = smc_read("PSTR", &value) == 0 && value > 0 ? value : nil
+        s.chargerWatts = smc_read("PDTR", &value) == 0 && value > 0.5 ? value : nil
+    }
 
+    // the battery's registry entry is big, so this one runs less often
+    func readBattery(into s: inout BatterySample) {
         let service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("AppleSmartBattery"))
-        guard service != 0 else { return s }
+        guard service != 0 else {
+            s.present = false
+            return
+        }
         defer { IOObjectRelease(service) }
         var props: Unmanaged<CFMutableDictionary>?
         guard IORegistryEntryCreateCFProperties(service, &props, kCFAllocatorDefault, 0) == KERN_SUCCESS,
-              let d = props?.takeRetainedValue() as? [String: Any] else { return s }
+              let d = props?.takeRetainedValue() as? [String: Any] else { return }
 
         s.present = true
         let current = d["CurrentCapacity"] as? Int ?? 0
@@ -48,22 +53,21 @@ final class BatteryReader {
         s.designCapacity = (data["DesignCapacity"] ?? d["DesignCapacity"]) as? Int ?? 0
         s.fullCapacity = (data["FullChargeCapacity"] ?? d["AppleRawMaxCapacity"]) as? Int ?? 0
         let nominal = (data["NominalChargeCapacity"] ?? d["NominalChargeCapacity"]) as? Int ?? s.fullCapacity
-        if s.designCapacity > 0, nominal > 0 {
-            s.health = min(Double(nominal) / Double(s.designCapacity), 1)
-        }
+        s.health = s.designCapacity > 0 && nominal > 0 ? min(Double(nominal) / Double(s.designCapacity), 1) : nil
 
         // 65535 means macOS is still working it out
         let minutes = (s.charging ? d["AvgTimeToFull"] : d["AvgTimeToEmpty"]) as? Int
-        if let minutes, minutes > 0, minutes < 65535 { s.minutesLeft = minutes }
+        s.minutesLeft = minutes.flatMap { $0 > 0 && $0 < 65535 ? $0 : nil }
 
         let volts = Double(d["Voltage"] as? Int ?? 0) / 1000
         let amps = Double((d["Amperage"] as? NSNumber)?.int64Value ?? 0) / 1000
         s.batteryWatts = volts * amps
 
+        s.adapter = nil
+        s.adapterWatts = nil
         if s.pluggedIn, let adapter = d["AdapterDetails"] as? [String: Any] {
             s.adapter = adapter["Name"] as? String ?? adapter["Description"] as? String
             if let watts = adapter["Watts"] as? Int, watts > 0 { s.adapterWatts = Double(watts) }
         }
-        return s
     }
 }

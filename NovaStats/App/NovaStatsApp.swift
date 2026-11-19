@@ -16,7 +16,7 @@ struct NovaStatsApp: App {
         .menuBarExtraStyle(.window)
         .commands {
             CommandGroup(replacing: .appSettings) {
-                Button("Settings…") { Windows.shared.showSettings() }
+                Button("Settings…") { Windows.shared.toggleSettings() }
                     .keyboardShortcut(",")
             }
             CommandGroup(replacing: .newItem) {

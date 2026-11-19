@@ -1,21 +1,27 @@
 import SwiftUI
 
-// the dashboard and settings are plain AppKit windows so they can be opened
-// from anywhere (menu bar, dock, notifications) and torn down when closed
+// the dashboard is a plain AppKit window so it can be opened from anywhere
+// (menu bar, dock, shortcuts, widgets) and torn down when closed.
+// settings live inside it as a panel, not in a window of their own
 final class Windows: NSObject, NSWindowDelegate {
     static let shared = Windows()
 
     private var dashboard: NSWindow?
-    private var settings: NSWindow?
+
+    // open, not covered and not minimized: the sampler only works hard then
+    var dashboardOnScreen: Bool {
+        guard let dashboard, dashboard.isVisible, !dashboard.isMiniaturized else { return false }
+        return dashboard.occlusionState.contains(.visible) && dashboard.contentView is NSHostingView<AnyView>
+    }
 
     func showDashboard() {
-        let window = dashboard ?? makeWindow(size: NSSize(width: 1140, height: 780), resizable: true, name: "Dashboard")
-        window.minSize = NSSize(width: 1000, height: 700)
+        let window = dashboard ?? makeWindow()
         dashboard = window
         if !(window.contentView is NSHostingView<AnyView>) {
             window.contentView = NSHostingView(rootView: AnyView(DashboardView().environment(Monitor.shared)))
         }
-        show(window)
+        NSApp.activate()
+        window.makeKeyAndOrderFront(nil)
     }
 
     // the shortcut opens the dashboard, or puts it away if it's already in front
@@ -27,25 +33,32 @@ final class Windows: NSObject, NSWindowDelegate {
         }
     }
 
-    func showSettings(_ section: SettingsSection? = nil) {
-        let window = settings ?? makeWindow(size: NSSize(width: 620, height: 620), resizable: false, name: "Settings")
-        settings = window
-        if section != nil || !(window.contentView is NSHostingView<AnyView>) {
-            window.contentView = NSHostingView(rootView: AnyView(SettingsView(section: section ?? .general).environment(Monitor.shared)))
+    func showSettings(_ section: SettingsSection = .general) {
+        showDashboard()
+        withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
+            UIState.shared.settings = section
         }
-        show(window)
     }
 
-    private func show(_ window: NSWindow) {
-        NSApp.activate()
-        window.makeKeyAndOrderFront(nil)
+    func toggleSettings() {
+        if UIState.shared.settings != nil, dashboard?.isKeyWindow == true {
+            closeSettings()
+        } else {
+            showSettings()
+        }
     }
 
-    private func makeWindow(size: NSSize, resizable: Bool, name: String) -> NSWindow {
-        var style: NSWindow.StyleMask = [.titled, .closable, .miniaturizable, .fullSizeContentView]
-        if resizable { style.insert(.resizable) }
-        let window = NSWindow(contentRect: NSRect(origin: .zero, size: size), styleMask: style, backing: .buffered, defer: false)
-        window.title = name == "Dashboard" ? "Nova Stats" : name
+    func closeSettings() {
+        withAnimation(.spring(response: 0.36, dampingFraction: 0.9)) {
+            UIState.shared.settings = nil
+        }
+    }
+
+    private func makeWindow() -> NSWindow {
+        let style: NSWindow.StyleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1140, height: 780), styleMask: style, backing: .buffered, defer: false)
+        window.title = "Nova Stats"
+        window.minSize = NSSize(width: 1000, height: 700)
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.backgroundColor = .black
@@ -53,14 +66,16 @@ final class Windows: NSObject, NSWindowDelegate {
         window.isMovableByWindowBackground = true
         window.isReleasedWhenClosed = false
         window.isRestorable = false // we decide what opens at launch, not macOS's resume
+        window.tabbingMode = .disallowed // never merge into a tab, even in full screen
         window.delegate = self
         window.center()
-        window.setFrameAutosaveName(name)
+        window.setFrameAutosaveName("Dashboard")
         return window
     }
 
     func windowWillClose(_ notification: Notification) {
         guard let window = notification.object as? NSWindow else { return }
+        UIState.shared.settings = nil
         // drop the swiftui tree, a closed window shouldn't keep drawing stars
         DispatchQueue.main.async { window.contentView = NSView() }
     }

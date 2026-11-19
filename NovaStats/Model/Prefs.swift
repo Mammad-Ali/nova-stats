@@ -60,6 +60,7 @@ struct Shortcut: Codable, Equatable {
 
     static let dashboard = Shortcut(keyCode: 45, modifiers: 4096 | 2048, label: "⌃⌥N") // control option N
     static let hud = Shortcut(keyCode: 4, modifiers: 4096 | 2048, label: "⌃⌥H")
+    static let game = Shortcut(keyCode: 5, modifiers: 4096 | 2048, label: "⌃⌥G")
 }
 
 enum Corner: String, CaseIterable {
@@ -115,8 +116,10 @@ final class Prefs {
 
     var dashboardShortcut: Shortcut? { didSet { saveShortcut(dashboardShortcut, "dashboardShortcut") } }
     var hudShortcut: Shortcut? { didSet { saveShortcut(hudShortcut, "hudShortcut") } }
+    var gameShortcut: Shortcut? { didSet { saveShortcut(gameShortcut, "gameShortcut") } }
 
-    var showHUD: Bool { didSet { d.set(showHUD, forKey: "showHUD"); HUDController.shared.refresh() } }
+    // game mode starts by itself when a game goes full screen
+    var gameAuto: Bool { didSet { d.set(gameAuto, forKey: "gameAuto"); GameMode.shared.updateWatching() } }
     var hudItems: [Metric] { didSet { save(hudItems, "hudItems"); HUDController.shared.refresh() } }
     var hudCorner: Corner { didSet { d.set(hudCorner.rawValue, forKey: "hudCorner"); HUDController.shared.refresh() } }
     var hudLayout: HUDLayout { didSet { d.set(hudLayout.rawValue, forKey: "hudLayout") } }
@@ -137,7 +140,7 @@ final class Prefs {
             "showDock": true,
             "showMenuBar": true,
             "menuBarItems": ["cpu", "cpuTemp"],
-            "showHUD": false,
+            "gameAuto": false,
             "hudItems": ["cpu", "gpu", "memory", "cpuTemp"],
             "hudCorner": Corner.topRight.rawValue,
             "hudLayout": HUDLayout.row.rawValue,
@@ -155,7 +158,7 @@ final class Prefs {
         showDock = d.bool(forKey: "showDock")
         showMenuBar = d.bool(forKey: "showMenuBar")
         menuBarItems = Prefs.load(d, "menuBarItems")
-        showHUD = d.bool(forKey: "showHUD")
+        gameAuto = d.bool(forKey: "gameAuto")
         hudItems = Prefs.load(d, "hudItems")
         hudCorner = Corner(rawValue: d.string(forKey: "hudCorner") ?? "") ?? .topRight
         hudLayout = HUDLayout(rawValue: d.string(forKey: "hudLayout") ?? "") ?? .row
@@ -163,6 +166,7 @@ final class Prefs {
         fahrenheit = d.bool(forKey: "fahrenheit")
         dashboardShortcut = Prefs.loadShortcut(d, "dashboardShortcut", .dashboard)
         hudShortcut = Prefs.loadShortcut(d, "hudShortcut", .hud)
+        gameShortcut = Prefs.loadShortcut(d, "gameShortcut", .game)
         alertTemp = d.bool(forKey: "alertTemp")
         alertTempLimit = d.double(forKey: "alertTempLimit")
         alertMemory = d.bool(forKey: "alertMemory")

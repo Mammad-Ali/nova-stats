@@ -63,6 +63,10 @@ func formatWatts(_ value: Double) -> String {
     return String(format: abs(value) < 10 ? "%.1f W" : "%.0f W", value)
 }
 
+func formatSession(_ seconds: TimeInterval) -> String {
+    seconds < 60 ? "under a minute" : formatMinutes(Int(seconds / 60))
+}
+
 func formatMinutes(_ minutes: Int) -> String {
     minutes >= 60 ? "\(minutes / 60)h \(minutes % 60)m" : "\(minutes)m"
 }

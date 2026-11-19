@@ -22,6 +22,7 @@ final class Hotkeys {
         }
         add(Prefs.shared.dashboardShortcut, 1)
         add(Prefs.shared.hudShortcut, 2)
+        add(Prefs.shared.gameShortcut, 3)
     }
 
     // while a new shortcut is being typed in settings
@@ -43,7 +44,8 @@ final class Hotkeys {
     private func pressed(_ id: UInt32) {
         switch id {
         case 1: Windows.shared.toggleDashboard()
-        case 2: Prefs.shared.showHUD.toggle()
+        case 2: GameMode.shared.toggleOverlay()
+        case 3: GameMode.shared.toggle()
         default: break
         }
     }

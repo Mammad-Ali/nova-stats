@@ -3,82 +3,100 @@ import ServiceManagement
 import UserNotifications
 
 enum SettingsSection: String, CaseIterable {
-    case general, menuBar, hud, alerts, about
+    case general, menuBar, game, alerts, about
 
     var title: String {
         switch self {
         case .general: "General"
         case .menuBar: "Menu bar"
-        case .hud: "HUD"
+        case .game: "Game mode"
         case .alerts: "Alerts"
         case .about: "About"
         }
     }
 }
 
+// a panel that slides up inside the dashboard, as tall as what it shows
 struct SettingsView: View {
-    @State var section: SettingsSection
+    var maxHeight: CGFloat
+    @State private var ui = UIState.shared
     @State private var prefs = Prefs.shared
+    @State private var game = GameMode.shared
+    @State private var contentHeight: CGFloat = 240
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Text("Settings")
-                .font(.system(size: 26, weight: .bold))
-                .foregroundStyle(Nova.sun)
-            PillPicker(options: SettingsSection.allCases, label: \.title, selection: $section)
+        let section = Binding(get: { ui.settings ?? .general }, set: { ui.settings = $0 })
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Settings")
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(Nova.sun)
+                Spacer()
+                Button {
+                    Windows.shared.closeSettings()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Nova.textMid)
+                        .frame(width: 30, height: 30)
+                        .background(Circle().fill(.white.opacity(0.08)))
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .keyboardShortcut(.cancelAction)
+                .help("Close  esc")
+            }
+            PillPicker(options: SettingsSection.allCases, label: \.title, selection: section)
             ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
-                    switch section {
+                VStack(alignment: .leading, spacing: 14) {
+                    switch section.wrappedValue {
                     case .general: general
                     case .menuBar: menuBar
-                    case .hud: hud
+                    case .game: gameMode
                     case .alerts: AlertSettings(prefs: prefs)
                     case .about: AboutSection()
                     }
                 }
-                .padding(.bottom, 24)
-                .id(section)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
+                .id(section.wrappedValue)
                 .transition(.asymmetric(insertion: .opacity, removal: .identity))
             }
             .scrollIndicators(.never)
+            .frame(height: min(contentHeight, max(maxHeight - 120, 200)))
         }
-        .padding(.horizontal, 24)
-        .padding(.top, 14)
-        .frame(width: 620, height: 620, alignment: .topLeading)
-        .background(.black)
+        .padding(22)
+        .frame(width: 620)
+        .background(RoundedRectangle(cornerRadius: 26, style: .continuous).fill(Color(white: 0.035)))
+        .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous).strokeBorder(.white.opacity(0.1)))
+        .shadow(color: .black.opacity(0.7), radius: 40, y: 12)
         .environment(\.colorScheme, .dark)
     }
 
     @ViewBuilder private var general: some View {
         Group {
-            SectionTitle("Dashboard")
             Rows {
                 SwitchRow(title: "Open the dashboard at launch", isOn: $prefs.openOnLaunch)
-                SwitchRow(title: "Moving stars", subtitle: "Nova's 3D starfield behind the dashboard. Off saves a bit of battery.",
-                          isOn: $prefs.starfield)
-            }
-            SectionTitle("Units")
-            Rows {
+                SwitchRow(title: "Moving stars", subtitle: "Nova's 3D starfield behind the dashboard.", isOn: $prefs.starfield)
                 LabeledRow(title: "Temperature") {
                     PillPicker(options: [false, true], label: { $0 ? "°F" : "°C" }, selection: $prefs.fahrenheit, small: true)
                 }
-            }
-            SectionTitle("Shortcuts")
-            Rows {
-                LabeledRow(title: "Open or close the dashboard") {
-                    ShortcutField(shortcut: $prefs.dashboardShortcut)
-                }
-                LabeledRow(title: "Show or hide the HUD") {
-                    ShortcutField(shortcut: $prefs.hudShortcut)
-                }
-            }
-            SectionTitle("App")
-            Rows {
                 SwitchRow(title: "Show in Dock",
                           subtitle: prefs.showMenuBar ? nil : "Stays on while the menu bar item is off, so you can reach the app.",
                           isOn: $prefs.showDock)
                     .disabled(!prefs.showMenuBar)
                 LoginRow()
+            }
+            SectionTitle("Shortcuts, from any app")
+            Rows {
+                LabeledRow(title: "Open or close the dashboard") {
+                    ShortcutField(shortcut: $prefs.dashboardShortcut)
+                }
+                LabeledRow(title: "Start or stop game mode") {
+                    ShortcutField(shortcut: $prefs.gameShortcut)
+                }
+                LabeledRow(title: "Show or hide the overlay") {
+                    ShortcutField(shortcut: $prefs.hudShortcut)
+                }
             }
         }
     }
@@ -88,33 +106,41 @@ struct SettingsView: View {
             Rows {
                 SwitchRow(title: "Show in menu bar", subtitle: "Live numbers next to the clock. Click them for a quick panel.",
                           isOn: $prefs.showMenuBar)
-                SwitchRow(title: "CPU graph", subtitle: "A tiny live chart of the last 12 seconds before the numbers.",
-                          isOn: $prefs.menuBarGraph)
+                SwitchRow(title: "CPU graph", subtitle: "A tiny live chart of the last 12 seconds.", isOn: $prefs.menuBarGraph)
+                LabeledRow(title: "Preview") {
+                    MenuBarLabel(monitor: Monitor.shared, prefs: prefs)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Capsule().fill(.white.opacity(0.1)))
+                }
             }
             SectionTitle("Shows")
             MetricPicker(selection: $prefs.menuBarItems)
-            SectionTitle("Preview")
-            HStack {
-                Spacer()
-                MenuBarLabel(monitor: Monitor.shared, prefs: prefs)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Capsule().fill(.white.opacity(0.1)))
-                Spacer()
-            }
-            .padding(.vertical, 14)
-            .glass(16)
         }
     }
 
-    @ViewBuilder private var hud: some View {
+    @ViewBuilder private var gameMode: some View {
         Group {
             Rows {
-                SwitchRow(title: "Show HUD", subtitle: "A small box with live stats on top of every app. Clicks go right through it.",
-                          isOn: $prefs.showHUD)
+                HStack(spacing: 16) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(game.active ? "Game mode is on" : "Game mode is off")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(.white)
+                        Text("While it's on, the overlay shows your stats over the game, and when you stop you get a report.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Nova.textLo)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer()
+                    Button(game.active ? "Stop" : "Start") { GameMode.shared.toggle() }
+                        .buttonStyle(OutlineButton(active: game.active))
+                }
+                SwitchRow(title: "Start automatically", subtitle: "When a game is in front in full screen. It stops when you leave the game.",
+                          isOn: $prefs.gameAuto)
             }
-            SectionTitle("Position")
+            SectionTitle("Overlay")
             Rows {
                 LabeledRow(title: "Corner") {
                     PillPicker(options: Corner.allCases, label: \.title, selection: $prefs.hudCorner, small: true)
@@ -123,8 +149,33 @@ struct SettingsView: View {
                     PillPicker(options: HUDLayout.allCases, label: \.title, selection: $prefs.hudLayout, small: true)
                 }
             }
-            SectionTitle("Shows")
             MetricPicker(selection: $prefs.hudItems)
+            if !game.reports.isEmpty {
+                SectionTitle("Recent sessions")
+                Rows {
+                    ForEach(game.reports.prefix(5)) { report in
+                        Button {
+                            ReportWindow.shared.show(report)
+                        } label: {
+                            HStack {
+                                Text(report.game)
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(.white)
+                                    .lineLimit(1)
+                                Spacer()
+                                Text("\(formatSession(report.duration)) · \(report.start.formatted(date: .abbreviated, time: .shortened))")
+                                    .font(.system(size: 12).monospacedDigit())
+                                    .foregroundStyle(Nova.textLo)
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(Nova.textLo)
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
         }
     }
 }
@@ -218,7 +269,7 @@ struct SectionTitle: View {
             .font(.system(size: 12.5, weight: .bold))
             .tracking(0.3)
             .foregroundStyle(Nova.textMid)
-            .padding(.bottom, -10)
+            .padding(.bottom, -6)
     }
 }
 
@@ -226,10 +277,10 @@ struct Rows<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             content
         }
-        .padding(16)
+        .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .glass(16)
     }

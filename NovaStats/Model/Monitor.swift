@@ -50,6 +50,7 @@ final class Monitor {
     @ObservationIgnored private var tempReader: TempReader? // made on the sampler queue
     @ObservationIgnored private let batteryReader = BatteryReader()
     @ObservationIgnored private var mountObservers: [NSObjectProtocol] = []
+    @ObservationIgnored private var screenAsleep = false
     @ObservationIgnored private let queue = DispatchQueue(label: "novastats.sampler", qos: .utility)
     @ObservationIgnored private var timer: Timer?
 
@@ -61,27 +62,99 @@ final class Monitor {
                 queue.async { self.diskReader.refreshSoon() }
             })
         }
+        let workspace = NSWorkspace.shared.notificationCenter
+        mountObservers.append(workspace.addObserver(forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.screenAsleep = true
+        })
+        mountObservers.append(workspace.addObserver(forName: NSWorkspace.screensDidWakeNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.screenAsleep = false
+        })
+        let distributed = DistributedNotificationCenter.default()
+        mountObservers.append(distributed.addObserver(forName: Notification.Name("com.apple.screenIsLocked"), object: nil, queue: .main) { [weak self] _ in
+            self?.screenAsleep = true
+        })
+        mountObservers.append(distributed.addObserver(forName: Notification.Name("com.apple.screenIsUnlocked"), object: nil, queue: .main) { [weak self] _ in
+            self?.screenAsleep = false
+        })
         sample()
         let t = Timer(timeInterval: 1, repeats: true) { [weak self] _ in self?.sample() }
-        t.tolerance = 0.1
+        t.tolerance = 0.25 // lets macOS line our wakeups up with others
         RunLoop.main.add(t, forMode: .common)
         timer = t
     }
 
+    // what someone can see decides how often the costly readers run
+    private struct Needs {
+        var dashboard = false
+        var tab = Tab.overview
+        var metrics: Set<Metric> = []
+        var gaming = false
+
+        func shows(_ wanted: Metric...) -> Bool { !metrics.isDisjoint(with: wanted) }
+        func on(_ tabs: Tab...) -> Bool { dashboard && tabs.contains(tab) }
+    }
+
+    @ObservationIgnored private var lastRead: [String: TimeInterval] = [:] // sampler queue only
+    @ObservationIgnored private var held = (gpu: GPUSample(), disk: DiskSample(), temps: TempSample(),
+                                            battery: BatterySample(), topCPU: [AppUsage](), topMemory: [AppUsage]())
+
+    private func currentNeeds() -> Needs {
+        var needs = Needs()
+        let prefs = Prefs.shared
+        let game = GameMode.shared
+        needs.dashboard = Windows.shared.dashboardOnScreen && !screenAsleep
+        needs.tab = UIState.shared.tab
+        needs.gaming = game.active
+        if !screenAsleep {
+            if prefs.showMenuBar { needs.metrics.formUnion(prefs.menuBarItems) }
+            if game.overlayVisible { needs.metrics.formUnion(prefs.hudItems) }
+        }
+        return needs
+    }
+
+    // true when the reader should run now: every tick while live, else every `slow` seconds
+    private func due(_ name: String, live: Bool, slow: TimeInterval, now: TimeInterval) -> Bool {
+        if !live, let last = lastRead[name], now - last < slow { return false }
+        lastRead[name] = now
+        return true
+    }
+
     private func sample() {
+        let needs = currentNeeds()
         queue.async { [self] in
             if tempReader == nil { tempReader = TempReader() }
+            let now = ProcessInfo.processInfo.systemUptime
+
+            // cheap, always live: the menu bar and alerts lean on these
             let cpu = cpuReader.read()
-            let gpu = gpuReader.read()
             let memory = memoryReader.read()
-            let disk = diskReader.read()
             let net = netReader.read()
-            let temps = tempReader?.read() ?? TempSample()
-            let battery = batteryReader.read()
-            let uptime = ProcessInfo.processInfo.systemUptime
-            let apps = processReader.read()
-            let topCPU = Array(apps.sorted { $0.cpu > $1.cpu }.prefix(10))
-            let topMemory = Array(apps.sorted { $0.memory > $1.memory }.prefix(10))
+
+            if due("gpu", live: needs.dashboard || needs.gaming || needs.shows(.gpu), slow: 5, now: now) {
+                held.gpu = gpuReader.read()
+            }
+            let everything = needs.dashboard || needs.gaming || needs.shows(.gpuTemp, .ssdTemp)
+            if due("temps", live: everything || needs.shows(.cpuTemp), slow: 5, now: now) {
+                // everything else every 5 seconds even when only the cpu number shows
+                let full = everything || due("allTemps", live: false, slow: 5, now: now)
+                tempReader?.read(into: &held.temps, everything: full, list: needs.on(.sensors))
+            }
+            if due("disk", live: needs.on(.overview, .disk) || needs.shows(.diskFree), slow: 5, now: now) {
+                held.disk = diskReader.read(volumes: needs.on(.disk))
+            }
+            if due("power", live: needs.on(.battery) || needs.gaming || needs.shows(.power), slow: 5, now: now) {
+                batteryReader.readPower(into: &held.battery)
+            }
+            if due("battery", live: needs.on(.battery) || needs.shows(.battery), slow: 30, now: now) {
+                batteryReader.readBattery(into: &held.battery)
+            }
+            if due("apps", live: needs.on(.memory), slow: 10, now: now) {
+                let apps = processReader.read()
+                held.topCPU = Array(apps.sorted { $0.cpu > $1.cpu }.prefix(10))
+                held.topMemory = Array(apps.sorted { $0.memory > $1.memory }.prefix(10))
+            }
+            let gpu = held.gpu, disk = held.disk, temps = held.temps, battery = held.battery
+            let topCPU = held.topCPU, topMemory = held.topMemory
 
             DispatchQueue.main.async { [self] in
                 self.cpu = cpu
@@ -91,7 +164,7 @@ final class Monitor {
                 self.net = net
                 self.temps = temps
                 self.battery = battery
-                self.uptime = uptime
+                self.uptime = now
                 self.topCPU = topCPU
                 self.topMemory = topMemory
 
@@ -108,6 +181,7 @@ final class Monitor {
                 History.push(&h.power, battery.systemWatts ?? 0)
                 history = h
                 Alerts.shared.check(self)
+                GameMode.shared.record(self)
                 WidgetWriter.shared.update(self)
             }
         }

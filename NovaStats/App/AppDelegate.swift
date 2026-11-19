@@ -6,11 +6,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         let prefs = Prefs.shared
         prefs.applyDock()
         Monitor.shared.start()
-        HUDController.shared.refresh()
+        GameMode.shared.updateWatching()
         Hotkeys.shared.register()
         UNUserNotificationCenter.current().delegate = self
         if prefs.anyAlert { Alerts.shared.requestPermission() }
-        if prefs.openOnLaunch || (!prefs.showMenuBar && !prefs.showHUD) {
+        if prefs.openOnLaunch || !prefs.showMenuBar {
             Windows.shared.showDashboard()
         }
     }
