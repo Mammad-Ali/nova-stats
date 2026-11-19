@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Nova Stats — a system monitor for the Mac</title>
-<meta name="description" content="Free, open-source system monitor for the Mac: CPU, GPU, memory, disk, network, battery and temperatures in a dashboard, the menu bar, a HUD and widgets.">
+<meta name="description" content="Free, open-source system monitor for the Mac: CPU, GPU, memory, disk, network, battery and temperatures in a dashboard, the menu bar, widgets and a game mode overlayets.">
 <meta property="og:title" content="Nova Stats">
 <meta property="og:description" content="What your Mac is doing, in Nova's colors. Free and open source.">
 <meta property="og:image" content="https://mammad-ali.github.io/nova-stats/dashboard.png">
@@ -156,7 +156,7 @@
     <img class="icon" src="icon.png" alt="The Nova Stats icon: a chip with Nova's yellow star rising from it">
     <h1>Nova Stats</h1>
     <p class="tagline">What your Mac is doing, in Nova's colors.</p>
-    <p class="sub">CPU, GPU, memory, disk, network, battery and temperatures, in a dashboard, the menu bar, a small HUD over your other apps and desktop widgets.</p>
+    <p class="sub">CPU, GPU, memory, disk, network, battery and temperatures, in a dashboard, the menu bar, desktop widgets and a game mode overlay.</p>
     <div class="actions">
       <a class="pill" href="https://github.com/Mammad-Ali/nova-stats/releases/latest/download/Nova-Stats.dmg">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12M6 11l6 6 6-6M5 20h14"/></svg>
@@ -170,7 +170,7 @@
 
   <section class="block" id="features">
     <h2>Everything at a glance</h2>
-    <p class="lead">Read straight from the chip's own counters and sensors, once a second, using about 1% of one CPU core when the window is closed.</p>
+    <p class="lead">Read straight from the chip's own counters and sensors, once a second, using about 1–2% of one CPU core when the window is closed.</p>
     <div class="grid">
       <div class="card">
         <svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="3"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></svg>
@@ -212,7 +212,7 @@
     <div class="showcase">
       <div class="card">
         <img src="menu.png" alt="The menu bar panel">
-        <p class="caption">The menu bar, with a quick panel, an optional mini CPU graph and a HUD switch</p>
+        <p class="caption">The menu bar, with a quick panel, an optional mini CPU graph and a game mode button</p>
       </div>
       <div class="stack">
         <div class="card">
@@ -220,8 +220,12 @@
           <p class="caption">Four desktop widgets</p>
         </div>
         <div class="card">
-          <img src="hud.png" alt="The HUD in a column: CPU, GPU, RAM, CPU temperature and power, with no box behind it" style="max-width:280px;margin:0 auto">
-          <p class="caption">The HUD floats over every app, even in full screen, with no box behind it, and clicks go right through it</p>
+          <img src="hud.png" alt="The game mode overlay in a column: CPU, GPU, RAM, CPU temperature and power, with no box behind it" style="max-width:280px;margin:0 auto">
+          <p class="caption">Game mode's overlay sits on top of your game, even in full screen, with no box behind it</p>
+        </div>
+        <div class="card">
+          <img src="report.png" alt="A session report: time played, average and peak CPU, GPU, power and temperatures, and a temperature chart" style="max-width:420px;margin:0 auto">
+          <p class="caption">The report you get when you stop game mode</p>
         </div>
       </div>
     </div>
@@ -229,7 +233,7 @@
       <div class="card">
         <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="3"/><path d="M7 10h1M11 10h1M15 10h2M7 14h10"/></svg>
         <h3>Shortcuts from anywhere</h3>
-        <p><code>⌃⌥N</code> opens the dashboard and <code>⌃⌥H</code> shows or hides the HUD, from any app. You can change both.</p>
+        <p><code>⌃⌥N</code> opens the dashboard, <code>⌃⌥G</code> starts game mode and <code>⌃⌥H</code> hides its overlay, from any app. You can change all three.</p>
       </div>
       <div class="card">
         <svg viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10 21h4"/></svg>
@@ -270,10 +274,11 @@
       <details><summary>Is Nova Stats free?</summary><p>Yes, completely. It's open source under the MIT license, so you can read the code, change it and share it.</p></details>
       <details><summary>Why does macOS say it can't check the app?</summary><p>Apple only vouches for apps from developers who pay for a yearly account. Nova Stats isn't signed that way, so the first time macOS blocks it. Open System Settings, go to Privacy &amp; Security, scroll down and press Open Anyway. You only do this once.</p></details>
       <details><summary>Does it send my data anywhere?</summary><p>No. Nova Stats never connects to the internet. Everything it measures stays on your Mac.</p></details>
-      <details><summary>Does it slow my Mac down?</summary><p>Barely. With the dashboard closed it uses about 1% of one CPU core. The open dashboard with moving stars uses about 7%; turn the stars off in Settings if you like.</p></details>
+      <details><summary>Does it slow my Mac down?</summary><p>Barely. With the dashboard closed it uses about 1–2% of one CPU core: anything you can't see is measured less often. The open dashboard with moving stars uses about 7%; turn the stars off in Settings if you like.</p></details>
       <details><summary>Where do the temperatures come from?</summary><p>Straight from the chip's own sensors (the SMC and the system's temperature sensors), the same ones macOS uses to run the fans. The CPU number is the average of the core sensors.</p></details>
       <details><summary>Which Macs does it work on?</summary><p>Macs with Apple Silicon (M1 to M5) on macOS 15 or newer. On Intel Macs most numbers work, but some temperatures may be missing.</p></details>
-      <details><summary>Why do the widgets update only every few minutes?</summary><p>macOS decides how often widgets may refresh. For numbers that change every second, use the menu bar or the HUD.</p></details>
+      <details><summary>What is game mode?</summary><p>Turn it on from the menu bar or with ⌃⌥G, or let it start by itself when a game goes full screen. While it's on, an overlay shows your stats over the game and warns you if the Mac gets so hot that macOS slows it down. When you stop, you get a report: how long you played and the average and peak CPU, GPU, temperatures and power. macOS doesn't let other apps read a game's FPS, so that isn't shown.</p></details>
+      <details><summary>Why do the widgets update only every few minutes?</summary><p>macOS decides how often widgets may refresh. For numbers that change every second, use the menu bar or game mode's overlay.</p></details>
       <details><summary>Why are some apps missing from the Apps list?</summary><p>Without an administrator password macOS only lets an app look at your own processes, not the system's. Everything you run yourself is there.</p></details>
       <details><summary>Why don't alerts show up?</summary><p>macOS needs your permission for notifications. Open System Settings, then Notifications, find Nova Stats and allow them. Settings → Alerts in the app has a button that takes you there.</p></details>
       <details><summary>How do I remove it?</summary><p>Quit it from the menu bar panel, then drag Nova Stats from Applications to the Bin. Its settings are in <code>~/Library/Preferences/com.mammadali.novastats.plist</code>.</p></details>

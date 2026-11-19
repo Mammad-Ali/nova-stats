@@ -7,7 +7,7 @@
 **What your Mac is doing, in Nova's colors.**
 
 CPU, GPU, memory, disk, network, battery and temperatures, in a dashboard,
-the menu bar, a small HUD over your other apps and desktop widgets.
+the menu bar, desktop widgets and a game mode overlay.
 
 ![macOS](https://img.shields.io/badge/macOS-15%2B-black)
 ![SwiftUI](https://img.shields.io/badge/SwiftUI-native-black)
@@ -51,30 +51,36 @@ It's a native SwiftUI app, made for Apple Silicon.
 
 | Menu bar | Widgets |
 |:---:|:---:|
-| <img src="docs/menu.png" alt="The menu bar panel with CPU, GPU, memory and disk bars, network speed, temperatures and buttons for the dashboard, HUD, settings and quit" width="300"> | <img src="docs/widgets.png" alt="The four widgets: CPU, Memory, System and Dashboard" width="100%"> |
+| <img src="docs/menu.png" alt="The menu bar panel with CPU, GPU, memory and disk bars, network speed, temperatures and buttons for the dashboard, game mode, settings and quit" width="300"> | <img src="docs/widgets.png" alt="The four widgets: CPU, Memory, System and Dashboard" width="100%"> |
 
 The menu bar shows the numbers you pick, with an optional tiny CPU graph. Its panel
-has buttons for the dashboard, the HUD and settings.
+has buttons for the dashboard, game mode and settings.
 
-The **HUD** floats over every app, even full screen ones. It has no box behind it,
-just outlined text, and clicks go right through it. You pick the corner, row or
-column, and what it shows.
+**Game mode** puts an overlay on top of your game, even in full screen: outlined text
+with no box behind it, and clicks go right through it. You pick the corner, row or
+column, and what it shows. It warns you when the Mac gets so hot that macOS slows it
+down, and when you stop you get a report: how long you played and the average and peak
+CPU, GPU, temperatures and power. Turn it on from the menu bar, with a shortcut, or let
+it start by itself when a game goes full screen.
 
 <p align="center">
-  <img src="docs/hud.png" alt="The HUD in a column: CPU, GPU, RAM, CPU temperature and power" width="260">
+  <img src="docs/hud.png" alt="The game mode overlay in a column: CPU, GPU, RAM, CPU temperature and power" width="260">
+  &nbsp;&nbsp;
+  <img src="docs/report.png" alt="A session report: time played, average and peak CPU, GPU, power and temperatures, and a temperature chart" width="380">
 </p>
 
-**Shortcuts** work from any app: <kbd>⌃⌥N</kbd> opens or closes the dashboard and
-<kbd>⌃⌥H</kbd> shows or hides the HUD. You can change both in Settings.
+**Shortcuts** work from any app: <kbd>⌃⌥N</kbd> opens or closes the dashboard,
+<kbd>⌃⌥G</kbd> starts or stops game mode and <kbd>⌃⌥H</kbd> shows or hides its overlay.
+You can change all three in Settings.
 
 **Alerts** tell you when the Mac runs hot, memory gets tight, the disk is almost full
 or the CPU has been busy for a minute. Each one at most every half hour.
 
-Everything is optional and set up in **Settings**, which also has an About page with
-the common questions:
+Everything is optional and set up in **Settings**, a panel inside the dashboard
+(<kbd>⌘,</kbd>), which also has an About page with the common questions:
 
 <p align="center">
-  <img src="docs/settings.png" alt="Settings, General section: dashboard, temperature unit, shortcuts and app options" width="500">
+  <img src="docs/settings.png" alt="The Settings panel inside the dashboard, on the Game mode section: start, start automatically, the overlay's corner, layout and stats" width="640">
 </p>
 
 ## Download
@@ -122,8 +128,10 @@ and in the app under Settings → About.
   (whole system) and `PDTR` (charger) power keys
 - **Apps**: `proc_pid_rusage` for every process, grouped by the `.app` they belong to
 - **Shortcuts**: Carbon hot keys, which need no accessibility permission
-- **Stars**: drawn with Metal, so the open dashboard costs about 7% of one CPU core and
-  a closed one about 1%. The shader compiles at launch, so the project builds
+- **Background work**: anything you can't see right now (a closed dashboard, a tab
+  you're not on) is measured every 5 to 30 seconds instead of every second, so with
+  only the menu bar it costs about 1–2% of one CPU core
+- **Stars**: drawn with Metal, so the open dashboard costs about 7% of one CPU core. The shader compiles at launch, so the project builds
   without Xcode's separate Metal toolchain
 - **Widgets**: the app writes a small JSON file to `~/Library/Application Support/Nova Stats`
   and the sandboxed widget reads it through a read-only exception. An app group would
