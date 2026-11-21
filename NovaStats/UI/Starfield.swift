@@ -234,7 +234,8 @@ final class StarRenderer: NSObject, MTKViewDelegate {
 
     func draw(in view: MTKView) {
         let size = view.bounds.size
-        guard size.width > 0, let pipeline, let queue, !buffers.isEmpty else { return }
+        // the stars would take a little gpu and cpu away from a benchmark
+        guard size.width > 0, let pipeline, let queue, !buffers.isEmpty, !TestLab.shared.benchmarking else { return }
 
         sky.level += (target - sky.level) * 0.05
         sky.step(to: Date(), size: size)

@@ -19,6 +19,12 @@ final class Alerts {
     func check(_ m: Monitor) {
         let p = Prefs.shared
         let now = Date()
+        // a stress test is meant to run hot, no need to warn about it
+        if TestLab.shared.running {
+            hotSince = nil
+            busySince = nil
+            return
+        }
 
         if p.alertTemp, let t = m.temps.cpu, t >= p.alertTempLimit {
             hotSince = hotSince ?? now

@@ -104,7 +104,7 @@ final class Monitor {
         let game = GameMode.shared
         needs.dashboard = Windows.shared.dashboardOnScreen && !screenAsleep
         needs.tab = UIState.shared.tab
-        needs.gaming = game.active
+        needs.gaming = game.active || TestLab.shared.running
         if !screenAsleep {
             if prefs.showMenuBar { needs.metrics.formUnion(prefs.menuBarItems) }
             if game.overlayVisible { needs.metrics.formUnion(prefs.hudItems) }
@@ -182,6 +182,7 @@ final class Monitor {
                 history = h
                 Alerts.shared.check(self)
                 GameMode.shared.record(self)
+                TestLab.shared.tick(self)
                 WidgetWriter.shared.update(self)
             }
         }

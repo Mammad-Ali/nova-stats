@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum Tab: Int, CaseIterable, Identifiable {
-    case overview, cpu, gpu, memory, disk, network, battery, sensors
+    case overview, cpu, gpu, memory, disk, network, battery, sensors, tests
 
     var id: Int { rawValue }
 
@@ -15,6 +15,7 @@ enum Tab: Int, CaseIterable, Identifiable {
         case .network: "Network"
         case .battery: "Battery"
         case .sensors: "Sensors"
+        case .tests: "Tests"
         }
     }
 
@@ -28,6 +29,7 @@ enum Tab: Int, CaseIterable, Identifiable {
         case .network: "arrow.up.arrow.down"
         case .battery: "battery.75percent"
         case .sensors: "thermometer.medium"
+        case .tests: "flame"
         }
     }
 }
@@ -63,6 +65,7 @@ struct DashboardView: View {
                     case .network: NetworkPage()
                     case .battery: BatteryPage()
                     case .sensors: SensorsPage()
+                    case .tests: TestsPage()
                     }
                 }
                 .padding(.horizontal, 20)
@@ -109,6 +112,9 @@ struct DashboardView: View {
                     .foregroundStyle(Nova.textMid)
             }
             Spacer()
+            TestActions(tab: ui.tab)
+                .padding(.trailing, 16)
+                .alignmentGuide(.lastTextBaseline) { $0[.bottom] - 6 }
             VStack(alignment: .trailing, spacing: 4) {
                 Text(monitor.machine)
                     .font(.system(size: 12, weight: .semibold))
