@@ -27,15 +27,30 @@ extension Monitor {
     }
 }
 
-// keeps the values from shoving each other around every second
-func valueWidth(_ metric: Metric) -> CGFloat {
+// the widest each value can get. it's laid out invisibly behind the real
+// value, so the space never changes and "100%" never wraps to two lines
+func widest(_ metric: Metric, compact: Bool) -> String {
     switch metric {
-    case .cpu, .gpu, .memory: 34
-    case .cpuTemp, .gpuTemp, .ssdTemp: 28
-    case .download, .upload: 66
-    case .diskFree: 56
-    case .battery: 34
-    case .power: 46
+    case .cpu, .gpu, .memory, .battery: "100%"
+    case .cpuTemp, .gpuTemp, .ssdTemp: "100°"
+    case .download, .upload: compact ? "888K" : "888 KB/s"
+    case .diskFree: "888 GB"
+    case .power: "88 W"
+    }
+}
+
+struct FixedValue: View {
+    var text: String
+    var metric: Metric
+    var compact = false
+
+    var body: some View {
+        ZStack(alignment: .trailing) {
+            Text(widest(metric, compact: compact)).hidden()
+            Text(text)
+        }
+        .lineLimit(1)
+        .fixedSize()
     }
 }
 
@@ -150,10 +165,9 @@ struct HUDItem: View {
                     .foregroundStyle(Nova.textMid)
                     .fixedSize()
             }
-            Text(m.value(metric))
+            FixedValue(text: m.value(metric), metric: metric)
                 .font(.system(size: 12, weight: .semibold).monospacedDigit())
                 .foregroundStyle(m.color(metric))
-                .frame(width: valueWidth(metric), alignment: .trailing)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

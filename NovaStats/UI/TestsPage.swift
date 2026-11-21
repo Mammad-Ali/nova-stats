@@ -21,16 +21,16 @@ func formatStressSpeed(_ v: Double, _ kind: StressKind) -> String {
 
 struct TestsPage: View {
     var body: some View {
-        VStack(spacing: 16) {
-            HStack(alignment: .top, spacing: 16) {
+        HStack(spacing: 16) {
+            VStack(spacing: 16) {
                 BenchmarkCard()
-                StressCard()
-            }
-            .frame(height: 300)
-            HStack(spacing: 16) {
-                StressChartCard()
+                    .frame(height: 330)
                 BenchHistoryCard()
-                    .frame(width: 400)
+            }
+            VStack(spacing: 16) {
+                StressCard()
+                    .frame(height: 330)
+                StressChartCard()
             }
         }
     }
@@ -40,19 +40,28 @@ struct BenchmarkCard: View {
     @State private var lab = TestLab.shared
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 10) {
             CardHeader(icon: "speedometer", title: "Benchmark") {
+                Text("about a minute")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Nova.textLo)
                 Button("Run all") { lab.runBenchmark() }
                     .buttonStyle(OutlineButton())
                     .disabled(lab.running)
                     .opacity(lab.running ? 0.4 : 1)
             }
-            BenchRow(kind: .cpu, value: cpuText)
-            BenchRow(kind: .gpu, value: lab.latest(\.gpuTflops).map { String(format: "%.2f TFLOPS", $0) })
-            BenchRow(kind: .memory, value: lab.latest(\.memory).map { String(format: "%.0f GB/s", $0) })
-            BenchRow(kind: .ssd, value: ssdText)
+            BenchRow(kind: .cpu, value: cpuText, spread: lab.latestCPU(\.cpuMulti)?.spread)
+            BenchRow(kind: .gpu, value: lab.latest(\.gpuTflops).map { String(format: "%.2f TFLOPS", $0) },
+                     spread: lab.latestSpread(\.gpuTflops, key: "gpu"))
+            BenchRow(kind: .ai, value: lab.latest(\.aiTflops).map { String(format: "%.2f TFLOPS matrix", $0) },
+                     spread: lab.latestSpread(\.aiTflops, key: "ai"))
+            BenchRow(kind: .video, value: lab.latest(\.videoFps).map { String(format: "%.0f fps, 4K HEVC", $0) },
+                     spread: lab.latestSpread(\.videoFps, key: "video"))
+            BenchRow(kind: .memory, value: lab.latest(\.memory).map { String(format: "%.0f GB/s", $0) },
+                     spread: lab.latestSpread(\.memory, key: "memory"))
+            BenchRow(kind: .ssd, value: ssdText, spread: lab.latestSpread(\.ssdRead, key: "ssd"))
             Spacer(minLength: 0)
-            Text("Scores use Nova Stats' own scale. Quit other apps for steady results.")
+            Text("Each test runs several rounds and keeps the middle one. Scores use Nova Stats' own scale.")
                 .font(.system(size: 11))
                 .foregroundStyle(Nova.textLo)
         }
@@ -60,8 +69,8 @@ struct BenchmarkCard: View {
     }
 
     private var cpuText: String? {
-        guard let single = lab.latest(\.cpuSingle), let multi = lab.latest(\.cpuMulti) else { return nil }
-        return "\(formatPoints(single)) one core · \(formatPoints(multi)) all"
+        guard let single = lab.latestCPU(\.cpuSingle), let multi = lab.latestCPU(\.cpuMulti) else { return nil }
+        return "\(formatPoints(single.value)) one core · \(formatPoints(multi.value)) all"
     }
 
     private var ssdText: String? {
@@ -73,6 +82,7 @@ struct BenchmarkCard: View {
 struct BenchRow: View {
     var kind: BenchKind
     var value: String?
+    var spread: Double?
     @State private var lab = TestLab.shared
 
     var body: some View {
@@ -81,12 +91,18 @@ struct BenchRow: View {
             Text(kind.title)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Nova.textMid)
-                .frame(width: 64, alignment: .leading)
-            Text(busy ? "Running…" : value ?? "Not run yet")
+                .frame(width: 56, alignment: .leading)
+            Text(busy ? "Running… \(formatPercent(lab.benchProgress))" : value ?? "Not run yet")
                 .font(.system(size: 14, weight: .semibold).monospacedDigit())
                 .foregroundStyle(busy ? Nova.sun : value == nil ? Nova.textLo : Nova.textHi)
                 .lineLimit(1)
-                .minimumScaleFactor(0.8)
+                .minimumScaleFactor(0.75)
+            if let spread, value != nil, !busy {
+                Text(String(format: "±%.1f%%", spread * 100))
+                    .font(.system(size: 11, weight: .medium).monospacedDigit())
+                    .foregroundStyle(Nova.textLo)
+                    .help("How far the rounds were apart")
+            }
             Spacer()
             Button("Run") { lab.runBenchmark([kind]) }
                 .buttonStyle(SmallButton())
@@ -217,35 +233,101 @@ struct StressChartCard: View {
     }
 }
 
+enum HistoryMetric: String, CaseIterable {
+    case cpu, gpu, ai, video, memory, ssd
+
+    var title: String {
+        switch self {
+        case .cpu: "CPU"
+        case .gpu: "GPU"
+        case .ai: "AI"
+        case .video: "Video"
+        case .memory: "RAM"
+        case .ssd: "SSD"
+        }
+    }
+
+    func value(_ run: BenchResult) -> Double? {
+        switch self {
+        case .cpu: run.currentScale ? run.cpuMulti : nil
+        case .gpu: run.gpuTflops
+        case .ai: run.aiTflops
+        case .video: run.videoFps
+        case .memory: run.memory
+        case .ssd: run.ssdRead
+        }
+    }
+
+    func format(_ v: Double) -> String {
+        switch self {
+        case .cpu: formatPoints(v)
+        case .gpu, .ai: String(format: "%.2f TF", v)
+        case .video: String(format: "%.0f fps", v)
+        case .memory: String(format: "%.0f GB/s", v)
+        case .ssd: formatRate(v * 1e6)
+        }
+    }
+}
+
 struct BenchHistoryCard: View {
     @State private var lab = TestLab.shared
+    @AppStorage("historyMetric") private var metric = HistoryMetric.cpu
+    @State private var picked: Date?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            CardHeader(icon: "clock.arrow.circlepath", title: "Past benchmarks")
-            if lab.benchmarks.isEmpty {
-                Text("Your benchmark runs show up here, so you can compare them.")
-                    .font(.system(size: 13))
+        let points = lab.benchmarks.reversed().compactMap { metric.value($0) }
+        VStack(alignment: .leading, spacing: 10) {
+            // the picker drops under the title when the window is narrow
+            ViewThatFits(in: .horizontal) {
+                HStack {
+                    CardHeader(icon: "chart.xyaxis.line", title: "History")
+                    PillPicker(options: HistoryMetric.allCases, label: \.title, selection: $metric, small: true)
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    CardHeader(icon: "chart.xyaxis.line", title: "History")
+                    PillPicker(options: HistoryMetric.allCases, label: \.title, selection: $metric, small: true)
+                }
+            }
+            if points.count >= 2 {
+                LineChart(series: [Series(color: Nova.sun, values: points)], window: points.count,
+                          maxValue: (points.max() ?? 1) * 1.15, grid: metric.format)
+                    .frame(height: 70)
+            } else {
+                Text(lab.benchmarks.isEmpty ? "Your benchmark runs show up here." : "Run the benchmark again to see a trend.")
+                    .font(.system(size: 12))
                     .foregroundStyle(Nova.textLo)
             }
+            if let latest = lab.benchmarks.first, let older = lab.benchmarks.first(where: { $0.date == picked }), older.date != latest.date {
+                Text("Latest vs \(older.date.formatted(date: .abbreviated, time: .shortened)): \(comparison(latest, older))")
+                    .font(.system(size: 11, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(Nova.sun)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 8) {
                     ForEach(lab.benchmarks) { run in
-                        VStack(alignment: .leading, spacing: 3) {
-                            HStack {
-                                Text(run.date.formatted(date: .abbreviated, time: .shortened))
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(Nova.textHi)
-                                Spacer()
-                                Text(run.onBattery ? "on battery" : "plugged in")
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(run.onBattery ? Nova.amber : Nova.textLo)
+                        Button {
+                            picked = picked == run.date ? nil : run.date
+                        } label: {
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack {
+                                    Text(run.date.formatted(date: .abbreviated, time: .shortened))
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(picked == run.date ? Nova.sun : Nova.textHi)
+                                    Spacer()
+                                    Text(run.onBattery ? "on battery" : "plugged in")
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundStyle(run.onBattery ? Nova.amber : Nova.textLo)
+                                }
+                                Text(summary(run))
+                                    .font(.system(size: 11).monospacedDigit())
+                                    .foregroundStyle(Nova.textMid)
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
-                            Text(summary(run))
-                                .font(.system(size: 11).monospacedDigit())
-                                .foregroundStyle(Nova.textMid)
-                                .fixedSize(horizontal: false, vertical: true)
+                            .contentShape(Rectangle())
                         }
+                        .buttonStyle(.plain)
+                        .help("Compare the latest run with this one")
                     }
                 }
             }
@@ -256,11 +338,25 @@ struct BenchHistoryCard: View {
 
     private func summary(_ run: BenchResult) -> String {
         var parts: [String] = []
-        if let s = run.cpuSingle, let m = run.cpuMulti { parts.append("CPU \(formatPoints(s)) / \(formatPoints(m))") }
+        if let s = run.cpuSingle, let m = run.cpuMulti {
+            parts.append(run.currentScale ? "CPU \(formatPoints(s)) / \(formatPoints(m))" : "CPU (older scale)")
+        }
         if let g = run.gpuTflops { parts.append(String(format: "GPU %.2f TF", g)) }
+        if let a = run.aiTflops { parts.append(String(format: "AI %.2f TF", a)) }
+        if let v = run.videoFps { parts.append(String(format: "Video %.0f fps", v)) }
         if let mem = run.memory { parts.append(String(format: "RAM %.0f GB/s", mem)) }
         if let w = run.ssdWrite, let r = run.ssdRead { parts.append("SSD \(formatRate(w * 1e6)) / \(formatRate(r * 1e6))") }
         return parts.joined(separator: " · ")
+    }
+
+    // percent change for every score both runs have
+    private func comparison(_ latest: BenchResult, _ older: BenchResult) -> String {
+        let parts = HistoryMetric.allCases.compactMap { m -> String? in
+            guard let new = m.value(latest), let old = m.value(older), old > 0 else { return nil }
+            let change = (new / old - 1) * 100
+            return String(format: "%@ %@%.1f%%", m.title, change >= 0 ? "+" : "−", abs(change))
+        }
+        return parts.isEmpty ? "nothing to compare" : parts.joined(separator: " · ")
     }
 }
 
@@ -342,8 +438,8 @@ struct RunningBanner: View {
                 .frame(width: 7, height: 7)
             switch lab.phase {
             case .benchmark(let kind):
-                Text("Benchmarking \(kind.title)…")
-                    .font(.system(size: 12, weight: .semibold))
+                Text("Benchmarking \(kind.title)… \(formatPercent(lab.benchProgress))")
+                    .font(.system(size: 12, weight: .semibold).monospacedDigit())
                     .foregroundStyle(Nova.textHi)
             case .stress(let kind):
                 Text("\(kind.name) · \(formatClock(Date().timeIntervalSince(lab.stressStart ?? Date()))) · \(formatStressSpeed(lab.speed, kind))")

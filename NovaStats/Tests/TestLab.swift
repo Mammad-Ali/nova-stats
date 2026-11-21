@@ -44,7 +44,7 @@ enum StressKind: String, CaseIterable, Identifiable, Codable {
 }
 
 enum BenchKind: String, CaseIterable, Identifiable {
-    case cpu, gpu, memory, ssd
+    case cpu, gpu, ai, video, memory, ssd
 
     var id: String { rawValue }
 
@@ -52,6 +52,8 @@ enum BenchKind: String, CaseIterable, Identifiable {
         switch self {
         case .cpu: "CPU"
         case .gpu: "GPU"
+        case .ai: "AI"
+        case .video: "Video"
         case .memory: "Memory"
         case .ssd: "SSD"
         }
@@ -65,9 +67,15 @@ struct BenchResult: Codable, Identifiable {
     var cpuSingle: Double?
     var cpuMulti: Double?
     var gpuTflops: Double?
+    var aiTflops: Double?
+    var videoFps: Double?
     var memory: Double? // GB/s
     var ssdWrite: Double? // MB/s
     var ssdRead: Double?
+    var spreads: [String: Double]? // how far the rounds were apart, ±
+    var scale: Int? // 2 since the three-kernel cpu score; older cpu scores don't compare
+
+    var currentScale: Bool { scale == 2 }
 }
 
 struct StressResult: Codable, Identifiable {
@@ -85,8 +93,27 @@ struct StressResult: Codable, Identifiable {
     var tempCurve: [Double]
 }
 
-// cpu scores are iterations a second, scaled to friendly numbers
-func cpuPoints(_ iterationsPerSecond: Double) -> Double { iterationsPerSecond / 250_000 }
+// one core of an M5 is 3,000 points: each kernel's speed is compared with
+// that core's, and the score is the geometric mean of the three
+enum CPUReference {
+    static func rate(_ kernel: CPUKernel) -> Double {
+        switch kernel {
+        case .integer: 7.0e8
+        case .float: 7.65e8
+        case .sort: 2.626e4
+        }
+    }
+
+    static func score(_ ratios: [Double]) -> Double {
+        guard !ratios.isEmpty else { return 0 }
+        return 3000 * exp(ratios.map { log(max($0, 1e-9)) }.reduce(0, +) / Double(ratios.count))
+    }
+}
+
+// the stress test runs the float kernel, shown in the same points
+func cpuPoints(_ iterationsPerSecond: Double) -> Double {
+    iterationsPerSecond / CPUReference.rate(.float) * 3000
+}
 
 // runs one test at a time: a benchmark or a stress test
 @Observable
@@ -162,38 +189,94 @@ final class TestLab {
 
         Thread.detachNewThread { [self] in
             var result = BenchResult(onBattery: onBattery)
+            result.scale = 2
+            var spreads: [String: Double] = [:]
             let cores = ProcessInfo.processInfo.activeProcessorCount
+            // the cpu has six parts (three kernels, one core and all), the rest one each
+            let steps = Double(kinds.reduce(0) { $0 + ($1 == .cpu ? 6 : 1) })
+            var step = 0.0
+            func advance() {
+                step += 1
+                let progress = step / steps
+                DispatchQueue.main.async { self.benchProgress = progress }
+            }
+
             for (i, kind) in kinds.enumerated() {
-                DispatchQueue.main.async {
-                    self.phase = .benchmark(kind)
-                    self.benchProgress = Double(i) / Double(kinds.count)
-                }
+                if i > 0 { Thread.sleep(forTimeInterval: 1.5) } // a short cool-down between tests
+                DispatchQueue.main.async { self.phase = .benchmark(kind) }
                 switch kind {
                 case .cpu:
-                    result.cpuSingle = cpuPoints(CPUWork.measure(threads: 1, seconds: 4))
-                    Thread.sleep(forTimeInterval: 0.5)
-                    result.cpuMulti = cpuPoints(CPUWork.measure(threads: cores, seconds: 4))
+                    for threads in [1, cores] {
+                        var ratios: [Double] = []
+                        var widest = 0.0
+                        for kernel in CPUKernel.allCases {
+                            let rounds = CPUWork.rounds(threads: threads, kernel: kernel, count: 3, seconds: 1.2)
+                            ratios.append(median(rounds) / CPUReference.rate(kernel))
+                            widest = max(widest, spread(rounds))
+                            advance()
+                        }
+                        if threads == 1 {
+                            result.cpuSingle = CPUReference.score(ratios)
+                            spreads["cpuSingle"] = widest
+                        } else {
+                            result.cpuMulti = CPUReference.score(ratios)
+                            spreads["cpuMulti"] = widest
+                        }
+                    }
                 case .gpu:
-                    result.gpuTflops = gpu.map { $0.measure(seconds: 4) / 1000 }
+                    if let rounds = gpu?.rounds(count: 5, seconds: 1.5), !rounds.isEmpty {
+                        result.gpuTflops = median(rounds)
+                        spreads["gpu"] = spread(rounds)
+                    }
+                    advance()
+                case .ai:
+                    let rounds = MatrixWork.rounds(count: 5, seconds: 1)
+                    result.aiTflops = median(rounds)
+                    spreads["ai"] = spread(rounds)
+                    advance()
+                case .video:
+                    let rounds = VideoWork.rounds(count: 4, seconds: 1.5)
+                    if !rounds.isEmpty {
+                        result.videoFps = median(rounds)
+                        spreads["video"] = spread(rounds)
+                    }
+                    advance()
                 case .memory:
-                    result.memory = MemoryWork.bandwidth(seconds: 3)
+                    let rounds = MemoryWork.rounds(count: 5, seconds: 1)
+                    result.memory = median(rounds)
+                    spreads["memory"] = spread(rounds)
+                    advance()
                 case .ssd:
                     if let speed = DiskWork.speed() {
                         result.ssdWrite = speed.write
-                        result.ssdRead = speed.read
+                        result.ssdRead = median(speed.read)
+                        spreads["ssd"] = spread(speed.read)
                     }
+                    advance()
                 }
-                Thread.sleep(forTimeInterval: 0.5) // a breath between tests
             }
+            result.spreads = spreads
             DispatchQueue.main.async {
                 self.benchmarks.insert(result, at: 0)
-                if self.benchmarks.count > 20 { self.benchmarks.removeLast(self.benchmarks.count - 20) }
+                if self.benchmarks.count > 30 { self.benchmarks.removeLast(self.benchmarks.count - 30) }
                 self.save()
                 self.benchProgress = 1
                 self.phase = .idle
                 self.say(kinds.count == 1 ? "\(kinds[0].title) benchmark done" : "Benchmark done")
             }
         }
+    }
+
+    // the newest cpu score on today's scale
+    func latestCPU(_ value: KeyPath<BenchResult, Double?>) -> (value: Double, spread: Double?)? {
+        guard let run = benchmarks.first(where: { $0.currentScale && $0[keyPath: value] != nil }) else { return nil }
+        let key = value == \BenchResult.cpuSingle ? "cpuSingle" : "cpuMulti"
+        return (run[keyPath: value]!, run.spreads?[key])
+    }
+
+    // the spread that came with the newest value of a metric
+    func latestSpread(_ value: KeyPath<BenchResult, Double?>, key: String) -> Double? {
+        benchmarks.first { $0[keyPath: value] != nil }?.spreads?[key]
     }
 
     // MARK: stress

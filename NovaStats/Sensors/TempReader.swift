@@ -9,10 +9,16 @@ struct TempSample {
     var fans: [Double] = []
     var hasFans = false
     var sensors: [(name: String, value: Double)] = []
+    // one value per sensor, nil when it reads nonsense: for the chip heat map
+    var performanceCores: [Double?] = []
+    var efficiencyCores: [Double?] = []
+    var gpuCores: [Double?] = []
 }
 
 final class TempReader {
     private var cpuKeys: [String] = []
+    private var performanceKeys: [String] = []
+    private var efficiencyKeys: [String] = []
     private var gpuKeys: [String] = []
     private var fanCount = 0
     private var services: [(name: String, service: IOHIDServiceClient)] = []
@@ -37,7 +43,9 @@ final class TempReader {
             keys.append(cString(name))
         }
         #if arch(arm64)
-        cpuKeys = keys.filter { $0.hasPrefix("Tp") || $0.hasPrefix("Te") }
+        performanceKeys = keys.filter { $0.hasPrefix("Tp") }
+        efficiencyKeys = keys.filter { $0.hasPrefix("Te") }
+        cpuKeys = performanceKeys + efficiencyKeys
         gpuKeys = keys.filter { $0.hasPrefix("Tg") }
         #else
         cpuKeys = keys.filter { ["TC0P", "TC0D", "TC0E", "TC0F"].contains($0) }
@@ -49,12 +57,15 @@ final class TempReader {
     // with only the cpu number on screen (the menu bar) just the cpu keys are
     // read and the rest is kept from last time; the sensor list is for the sensors tab
     func read(into s: inout TempSample, everything: Bool, list: Bool) {
-        let cpu = cpuKeys.compactMap { smc($0) }.filter(sane)
+        s.performanceCores = performanceKeys.map { smc($0).flatMap { sane($0) ? $0 : nil } }
+        s.efficiencyCores = efficiencyKeys.map { smc($0).flatMap { sane($0) ? $0 : nil } }
+        let cpu = (s.performanceCores + s.efficiencyCores).compactMap { $0 }
         s.cpu = average(cpu)
         s.cpuHottest = cpu.max()
         guard everything || cpuKeys.isEmpty else { return }
 
-        let gpu = gpuKeys.compactMap { smc($0) }.filter(sane)
+        s.gpuCores = gpuKeys.map { smc($0).flatMap { sane($0) ? $0 : nil } }
+        let gpu = s.gpuCores.compactMap { $0 }
         s.gpu = average(gpu)
 
         // asking hid for ~45 sensors is not free: the ssd and one battery

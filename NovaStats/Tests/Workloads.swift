@@ -37,35 +37,82 @@ private func now() -> Double { ProcessInfo.processInfo.systemUptime }
 
 // MARK: cpu
 
-enum CPUWork {
-    static let chunk = 1 << 20
+enum CPUKernel: String, CaseIterable {
+    case integer, float, sort
+}
 
-    // integer and vector float math mixed, so every part of a core gets used
+enum CPUWork {
+    // whole-number hashing: the integer units
     @inline(never)
-    static func run(_ iterations: Int, seed: UInt64) -> UInt64 {
+    static func integer(_ n: Int, seed: UInt64) -> UInt64 {
         var x = seed | 1
-        var a = SIMD4<Float>(1.0001, 0.9999, 1.0002, 0.9998)
-        var b = SIMD4<Float>(0.5, 0.25, 0.125, 0.0625)
-        let m = SIMD4<Float>(0.9999, 1.0001, 0.9998, 1.0002)
-        for _ in 0..<iterations {
+        var h: UInt64 = 0xcbf2_9ce4_8422_2325
+        for _ in 0..<n {
             x ^= x << 13
             x ^= x >> 7
             x ^= x << 17
-            let k = Float(x & 0xff) * 1e-7
-            a = a * m + SIMD4<Float>(repeating: k)
-            b = b * m + a * 1e-4
+            h = (h ^ x) &* 0x0000_0100_0000_01b3
+            h = h &+ (h >> 29)
         }
-        return x &+ UInt64((a + b).sum().bitPattern)
+        return h
+    }
+
+    // four independent chains of vector multiply-adds: the float units
+    @inline(never)
+    static func float(_ n: Int, seed: UInt64) -> UInt64 {
+        let s = Float(seed & 7 + 1) * 0.1
+        var a = SIMD4<Float>(1.0, 1.1, 1.2, 1.3) * s
+        var b = SIMD4<Float>(0.9, 0.8, 0.7, 0.6) * s
+        var c = SIMD4<Float>(0.5, 0.4, 0.3, 0.2) * s
+        var d = SIMD4<Float>(0.1, 0.2, 0.3, 0.4) * s
+        let m = SIMD4<Float>(0.9999, 1.0001, 0.9998, 1.0002)
+        let k = SIMD4<Float>(repeating: 1e-4)
+        for _ in 0..<n {
+            a = a * m + k
+            b = b * m + k
+            c = c * m + k
+            d = d * m + k
+        }
+        return UInt64((a + b + c + d).sum().bitPattern)
+    }
+
+    // fills an array with random numbers and sorts it: branches and cache
+    @inline(never)
+    static func sort(_ n: Int, seed: UInt64, buffer: inout [UInt32]) -> UInt64 {
+        var x = seed | 1
+        var sink: UInt64 = 0
+        for _ in 0..<n {
+            for i in buffer.indices {
+                x ^= x << 13
+                x ^= x >> 7
+                x ^= x << 17
+                buffer[i] = UInt32(truncatingIfNeeded: x)
+            }
+            buffer.sort()
+            sink &+= UInt64(buffer[buffer.count / 2])
+        }
+        return sink &+ x
+    }
+
+    // how much work one call does: iterations, or arrays sorted
+    static func chunk(_ kernel: CPUKernel) -> Int {
+        kernel == .sort ? 32 : 1 << 20
     }
 
     // keeps `threads` threads busy until the counter stops
-    static func start(threads: Int, counter: WorkCounter) {
+    static func start(threads: Int, kernel: CPUKernel = .float, counter: WorkCounter) {
         for i in 0..<threads {
             let thread = Thread {
                 var sink = UInt64(i + 1)
+                var buffer = [UInt32](repeating: 0, count: 1024)
+                let n = chunk(kernel)
                 while !counter.stopped {
-                    sink = run(chunk, seed: sink)
-                    counter.add(Double(chunk))
+                    switch kernel {
+                    case .integer: sink = integer(n, seed: sink)
+                    case .float: sink = float(n, seed: sink)
+                    case .sort: sink = sort(n, seed: sink, buffer: &buffer)
+                    }
+                    counter.add(Double(n))
                 }
                 if sink == 42 { print("") } // keeps the compiler from dropping the work
             }
@@ -74,19 +121,43 @@ enum CPUWork {
         }
     }
 
-    // iterations a second, measured for `seconds` after a short warm-up
-    static func measure(threads: Int, seconds: Double) -> Double {
+    // work a second in each of `count` rounds, after a warm-up so the clocks are up
+    static func rounds(threads: Int, kernel: CPUKernel, count: Int, seconds: Double) -> [Double] {
         let counter = WorkCounter()
-        start(threads: threads, counter: counter)
-        Thread.sleep(forTimeInterval: 0.5)
-        _ = counter.take()
-        let begin = now()
+        start(threads: threads, kernel: kernel, counter: counter)
+        defer { counter.stop() }
+        return timedRounds(counter, count: count, seconds: seconds)
+    }
+}
+
+// reads a counter in `count` windows of `seconds`, after a one second warm-up
+func timedRounds(_ counter: WorkCounter, count: Int, seconds: Double) -> [Double] {
+    Thread.sleep(forTimeInterval: 1)
+    _ = counter.take()
+    var out: [Double] = []
+    var begin = now()
+    for _ in 0..<count {
         Thread.sleep(forTimeInterval: seconds)
         let done = counter.take()
-        let elapsed = now() - begin
-        counter.stop()
-        return done / elapsed
+        let end = now()
+        out.append(done / (end - begin))
+        begin = end
     }
+    return out
+}
+
+func median(_ values: [Double]) -> Double {
+    let sorted = values.sorted()
+    guard !sorted.isEmpty else { return 0 }
+    let mid = sorted.count / 2
+    return sorted.count % 2 == 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid]
+}
+
+// how far the rounds were apart, as a share of the median (±)
+func spread(_ values: [Double]) -> Double {
+    let mid = median(values)
+    guard mid > 0, let low = values.min(), let high = values.max() else { return 0 }
+    return (high - low) / 2 / mid
 }
 
 // MARK: gpu
@@ -145,18 +216,12 @@ final class GPUWork {
         thread.start()
     }
 
-    // billions of float operations a second
-    func measure(seconds: Double) -> Double {
+    // trillions of float operations a second, per round
+    func rounds(count: Int, seconds: Double) -> [Double] {
         let counter = WorkCounter()
         start(counter: counter)
-        Thread.sleep(forTimeInterval: 0.5)
-        _ = counter.take()
-        let begin = now()
-        Thread.sleep(forTimeInterval: seconds)
-        let done = counter.take()
-        let elapsed = now() - begin
-        counter.stop()
-        return done / elapsed / 1e9
+        defer { counter.stop() }
+        return timedRounds(counter, count: count, seconds: seconds).map { $0 / 1e12 }
     }
 
     private static let shader = """
@@ -183,9 +248,9 @@ final class GPUWork {
 // MARK: memory
 
 enum MemoryWork {
-    // copies a big buffer with every core: GB/s, counting the read and the write
-    static func bandwidth(seconds: Double) -> Double {
-        let size = 256 << 20
+    // copies a big buffer with every core: GB/s per round, counting the read and the write
+    static func rounds(count: Int, seconds: Double) -> [Double] {
+        let size = 512 << 20
         let src = UnsafeMutableRawPointer.allocate(byteCount: size, alignment: 64)
         let dst = UnsafeMutableRawPointer.allocate(byteCount: size, alignment: 64)
         defer {
@@ -196,15 +261,23 @@ enum MemoryWork {
         memset(dst, 0, size) // touch every page before timing
         let parts = ProcessInfo.processInfo.activeProcessorCount
         let part = size / parts
-        var bytes = 0.0
-        let begin = now()
-        repeat {
+        func copy() {
             DispatchQueue.concurrentPerform(iterations: parts) { i in
                 memcpy(dst + i * part, src + i * part, part)
             }
-            bytes += Double(part * parts) * 2
-        } while now() - begin < seconds
-        return bytes / (now() - begin) / 1e9
+        }
+        copy()
+        var out: [Double] = []
+        for _ in 0..<count {
+            var bytes = 0.0
+            let begin = now()
+            repeat {
+                copy()
+                bytes += Double(part * parts) * 2
+            } while now() - begin < seconds
+            out.append(bytes / (now() - begin) / 1e9)
+        }
+        return out
     }
 
     // fills memory with patterns and checks every byte comes back the same
@@ -247,7 +320,7 @@ enum DiskWork {
     }
 
     // writes `size` bytes past the system cache, then reads them back: MB/s each way
-    static func speed(size: Int = 2 << 30) -> (write: Double, read: Double)? {
+    static func speed(size: Int = 4 << 30) -> (write: Double, read: [Double])? {
         guard freeBytes > Int64(size) * 3 else { return nil }
         defer { unlink(file.path) }
         let buffer = UnsafeMutableRawPointer.allocate(byteCount: block, alignment: 4096)
@@ -268,19 +341,23 @@ enum DiskWork {
         let writeSpeed = Double(written) / (now() - begin) / 1e6
         close(out)
 
-        let input = open(file.path, O_RDONLY)
-        guard input >= 0 else { return nil }
-        _ = fcntl(input, F_NOCACHE, 1)
-        begin = now()
-        var readBytes = 0
-        while true {
-            let n = read(input, buffer, block)
-            if n <= 0 { break }
-            readBytes += n
+        // read it back twice, past the cache both times
+        var reads: [Double] = []
+        for _ in 0..<2 {
+            let input = open(file.path, O_RDONLY)
+            guard input >= 0 else { return nil }
+            _ = fcntl(input, F_NOCACHE, 1)
+            begin = now()
+            var readBytes = 0
+            while true {
+                let n = read(input, buffer, block)
+                if n <= 0 { break }
+                readBytes += n
+            }
+            reads.append(Double(readBytes) / (now() - begin) / 1e6)
+            close(input)
         }
-        let readSpeed = Double(readBytes) / (now() - begin) / 1e6
-        close(input)
-        return (writeSpeed, readSpeed)
+        return (writeSpeed, reads)
     }
 
     // the file is written once, then only read from: reads don't wear the ssd out

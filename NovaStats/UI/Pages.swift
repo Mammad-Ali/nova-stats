@@ -287,29 +287,33 @@ struct SensorsPage: View {
                           legend: [(Nova.sun, "CPU"), (Nova.up, "GPU")], maxValue: 110, format: { formatTemp($0) })
             }
             .frame(height: 230)
-            VStack(alignment: .leading, spacing: 14) {
-                CardHeader(icon: "sensor", title: "All sensors") {
-                    Chip(text: "\(t.sensors.count)")
-                }
-                ScrollView {
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 20), count: 4), spacing: 10) {
-                        ForEach(t.sensors.indices, id: \.self) { i in
-                            HStack {
-                                Text(t.sensors[i].name)
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundStyle(Nova.textMid)
-                                    .lineLimit(1)
-                                Spacer()
-                                Text(formatTemp(t.sensors[i].value))
-                                    .font(.system(size: 12, weight: .semibold).monospacedDigit())
-                                    .foregroundStyle(Nova.heat(t.sensors[i].value))
+            HStack(spacing: 16) {
+                ChipMapCard()
+                    .frame(width: 440)
+                VStack(alignment: .leading, spacing: 14) {
+                    CardHeader(icon: "sensor", title: "All sensors") {
+                        Chip(text: "\(t.sensors.count)")
+                    }
+                    ScrollView {
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 20), count: 2), spacing: 10) {
+                            ForEach(t.sensors.indices, id: \.self) { i in
+                                HStack {
+                                    Text(t.sensors[i].name)
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundStyle(Nova.textMid)
+                                        .lineLimit(1)
+                                    Spacer()
+                                    Text(formatTemp(t.sensors[i].value))
+                                        .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                                        .foregroundStyle(Nova.heat(t.sensors[i].value))
+                                }
                             }
                         }
                     }
+                    .scrollIndicators(.never)
                 }
-                .scrollIndicators(.never)
+                .card()
             }
-            .card()
         }
     }
 }
@@ -318,11 +322,29 @@ struct DrivesCard: View {
     @Environment(Monitor.self) private var m
     @State private var problem: String?
 
+    @AppStorage("diskPanel") private var panel = "drives"
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            CardHeader(icon: "externaldrive", title: "Drives") {
-                Chip(text: "\(m.disk.volumes.count)")
+            HStack {
+                PillPicker(options: ["drives", "storage"], label: { $0 == "drives" ? "Drives" : "Storage" },
+                           selection: $panel, small: true)
+                Spacer()
+                if panel == "drives" {
+                    Chip(text: "\(m.disk.volumes.count)")
+                }
             }
+            if panel == "storage" {
+                StorageView()
+            } else {
+                drives
+            }
+        }
+        .card()
+    }
+
+    private var drives: some View {
+        VStack(alignment: .leading, spacing: 14) {
             ScrollView {
                 VStack(spacing: 14) {
                     ForEach(m.disk.volumes) { volume in
@@ -367,7 +389,6 @@ struct DrivesCard: View {
                     .foregroundStyle(Nova.amber)
             }
         }
-        .card()
     }
 
     private func eject(_ volume: Volume) {
@@ -438,5 +459,209 @@ struct BatteryPage: View {
             ("Temperature", formatTemp(m.temps.battery), Nova.heat(m.temps.battery)),
         ]
         return list
+    }
+}
+
+// what fills the disk, from the home folder down
+struct StorageView: View {
+    @State private var scanner = StorageScanner.shared
+
+    var body: some View {
+        switch scanner.state {
+        case .idle:
+            VStack(alignment: .leading, spacing: 12) {
+                Text("See which folders and files take the most space in your home folder.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Nova.textMid)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("Scan my home folder") { scanner.scan() }
+                    .buttonStyle(OutlineButton())
+                AccessNote(fullAccess: scanner.fullAccess)
+                Spacer(minLength: 0)
+            }
+            .onAppear { scanner.checkAccess() }
+        case .scanning(let files):
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 10) {
+                    ProgressView().controlSize(.small)
+                    Text("Scanning… \(formatPoints(Double(files))) files")
+                        .font(.system(size: 13, weight: .medium).monospacedDigit())
+                        .foregroundStyle(Nova.textHi)
+                }
+                if !scanner.reading.isEmpty {
+                    Text("Reading \(scanner.reading)")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Nova.textMid)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                Button("Cancel") { scanner.cancel() }
+                    .buttonStyle(SmallButton())
+                Spacer(minLength: 0)
+            }
+        case .done:
+            let entries = scanner.entries()
+            let locked = entries.filter(\.locked).map(\.name)
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 8) {
+                    if scanner.current != scanner.root {
+                        Button {
+                            scanner.up()
+                        } label: {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(Nova.textHi)
+                                .frame(width: 24, height: 24)
+                                .background(Circle().fill(.white.opacity(0.08)))
+                        }
+                        .buttonStyle(.plain)
+                        .help("Back")
+                    }
+                    Text(scanner.trail)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Nova.textHi)
+                        .lineLimit(1)
+                        .truncationMode(.head)
+                    Spacer()
+                    Text(formatBytes(Double(scanner.size(scanner.current))))
+                        .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(Nova.sun)
+                    Button {
+                        scanner.scan()
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Nova.textMid)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Scan again")
+                }
+                if !locked.isEmpty {
+                    Button { AccessNote.openSettings() } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "lock.fill")
+                            Text(lockedLine(locked))
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            Spacer(minLength: 4)
+                            Text("Unlock")
+                                .foregroundStyle(Nova.sun)
+                        }
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Nova.textLo)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Give Nova Stats Full Disk Access to include these folders")
+                }
+                let top = Double(entries.first?.size ?? 1)
+                ScrollView {
+                    VStack(spacing: 10) {
+                        ForEach(entries) { entry in
+                            StorageRow(entry: entry, fraction: Double(entry.size) / top)
+                        }
+                    }
+                }
+                .scrollIndicators(.never)
+            }
+        }
+    }
+}
+
+// "Desktop and Documents are locked", or "Desktop, Documents and 3 more are locked"
+func lockedLine(_ names: [String]) -> String {
+    switch names.count {
+    case 1: "\(names[0]) is locked"
+    case 2: "\(names[0]) and \(names[1]) are locked"
+    default: "\(names[0]), \(names[1]) and \(names.count - 2) more are locked"
+    }
+}
+
+struct StorageRow: View {
+    var entry: StorageEntry
+    var fraction: Double
+    @State private var hovered = false
+
+    var body: some View {
+        let rest = entry.path.hasSuffix("/…")
+        HStack(spacing: 10) {
+            Group {
+                if entry.locked {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Nova.textLo)
+                } else if rest {
+                    Image(systemName: "doc.on.doc")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Nova.textLo)
+                } else {
+                    Image(nsImage: AppIcons.icon(entry.path)).resizable()
+                }
+            }
+            .frame(width: 20, height: 20)
+            VStack(spacing: 5) {
+                HStack {
+                    Text(entry.name)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(entry.locked ? Nova.textMid : Nova.textHi)
+                        .lineLimit(1)
+                    if entry.folder {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(Nova.textLo)
+                    }
+                    Spacer(minLength: 8)
+                    Text(entry.locked ? "Locked" : formatBytes(Double(entry.size)))
+                        .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(entry.locked ? Nova.textLo : Nova.textMid)
+                }
+                Meter(value: entry.locked ? 0 : fraction, height: 3)
+            }
+            if !rest {
+                Button {
+                    NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: entry.path)])
+                } label: {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(hovered ? Nova.textHi : Nova.textLo)
+                }
+                .buttonStyle(.plain)
+                .help("Show in Finder")
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if entry.folder { StorageScanner.shared.open(entry.path) }
+            if entry.locked { AccessNote.openSettings() }
+        }
+        .onHover { hovered = $0 }
+        .help(entry.locked ? "macOS guards this folder. Click to give Nova Stats Full Disk Access." : "")
+    }
+}
+
+// says which folders the scan leaves out, and how to include them
+struct AccessNote: View {
+    var fullAccess: Bool
+
+    var body: some View {
+        if fullAccess {
+            Text("Nova Stats has Full Disk Access, so every folder is included.")
+                .font(.system(size: 11))
+                .foregroundStyle(Nova.textLo)
+                .fixedSize(horizontal: false, vertical: true)
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Folders macOS guards, like Desktop, Documents, Downloads, Photos and other apps' data, are skipped so you never get permission popups. To include them, give Nova Stats Full Disk Access.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Nova.textLo)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("Open Full Disk Access") { Self.openSettings() }
+                    .buttonStyle(SmallButton())
+            }
+        }
+    }
+
+    static func openSettings() {
+        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!)
     }
 }

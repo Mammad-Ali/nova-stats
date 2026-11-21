@@ -25,8 +25,7 @@ struct MenuBarLabel: View {
                 HStack(spacing: 3) {
                     Image(systemName: metric.icon)
                         .font(.system(size: metric.isTemp || metric == .download || metric == .upload ? 10 : 12, weight: .medium))
-                    Text(values[i])
-                        .frame(width: metric == .download || metric == .upload ? 36 : valueWidth(metric) - 4, alignment: .trailing)
+                    FixedValue(text: values[i], metric: metric, compact: true)
                 }
             }
         }

@@ -205,6 +205,8 @@ struct PillPicker<T: Hashable>: View {
                     Text(label(option))
                         .font(.system(size: small ? 11 : 13, weight: .semibold))
                         .foregroundStyle(active ? Color.black : Nova.textMid)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: small, vertical: false) // small pickers never cut their labels
                         .padding(.horizontal, small ? 10 : 12)
                         .frame(maxWidth: small ? nil : .infinity)
                         .frame(height: small ? 22 : 32)
