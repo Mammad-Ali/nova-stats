@@ -1,4 +1,4 @@
-Benchmarks and stress tests.
+Longer, steadier benchmarks, a chip heat map, a storage map, and Siri.
 
 **Install:** download `Nova-Stats.dmg`, open it and drag Nova Stats into Applications.
 The first time, macOS says it can't check the app, because it isn't signed with a paid
@@ -7,18 +7,23 @@ Apple developer account. Open System Settings → Privacy & Security, scroll dow
 
 What's new:
 
-- **Tests tab.** Benchmark the CPU (one core and all cores), the GPU, memory and the SSD,
-  and compare with your past runs, marked on battery or plugged in.
-- **Stress tests.** Push the CPU, the GPU, both, the RAM, the SSD, or everything at once
-  (the max power test) for 1, 5 or 10 minutes or until you stop. Live charts show the speed
-  and the temperature, and the summary tells you the peak temperature and watts and how
-  much the Mac slowed down from heat.
-- **Buttons where you need them.** The CPU, GPU, Memory, Disk and Battery tabs can start
-  their own test, so you can watch the cores fill up right where they're shown.
-- **Safe by design.** Tests stop by themselves above 110°, under 20% battery or when the
-  time is up. The SSD test only reads, so it doesn't wear the SSD, and the RAM test never
-  takes so much memory that macOS has to swap.
+- **More accurate benchmarks.** Every test warms up, runs several rounds and keeps the
+  middle one, and shows how far apart the rounds were (±). The CPU score now mixes three
+  kinds of work: integer math, vector math and sorting. The SSD test uses a 4 GB file.
+- **AI and video benchmarks.** Matrix math through Accelerate, the kind AI and photo apps
+  use, and 4K HEVC encoding on the chip's video engine.
+- **History chart.** Pick a score and see it over all your runs, and click an older run
+  to compare it with the latest one.
+- **Chip heat map.** The Sensors tab has a 3D chip with every core lit by its own
+  temperature.
+- **Storage map.** The Disk tab shows which folders and files take the most space in
+  your home folder. It never makes macOS pop up permission dialogs: guarded folders like
+  Desktop and Documents are marked as locked unless you give Nova Stats Full Disk Access.
+- **Siri and Shortcuts.** "How hot is my Mac in Nova Stats", "Check my Mac with Nova
+  Stats", game mode on and off, and the benchmark, as Siri phrases and Shortcuts actions.
+- **Fixes.** The menu bar no longer jumps to two lines when a value reaches 100%, and
+  small pickers no longer cut their labels in a narrow window.
 
-Scores are on Nova Stats' own scale, for comparing your own runs.
+CPU scores from 1.2 were on an older scale, so the history marks them as such.
 
 Needs macOS 15 or newer. Made for Apple Silicon.

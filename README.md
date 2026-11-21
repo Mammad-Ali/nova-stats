@@ -42,8 +42,17 @@ It's a native SwiftUI app, made for Apple Silicon.
 - **Battery** charge, health, charge cycles, time left, the charger, and how many
   watts the whole Mac uses right now
 - **Temperatures** for the CPU, GPU, SSD and battery, plus every other sensor the chip
-  has, in °C or °F
+  has, in °C or °F, and a **chip heat map**: a 3D chip with every core lit by its own
+  temperature
+- **Storage map** of your home folder: which folders and files take the most space,
+  folder by folder, with a button to show each one in Finder
 - **History** for the last 5 minutes, 30 minutes or hour
+
+<img src="docs/sensors.png" alt="The Sensors tab: the 3D chip heat map with performance cores, efficiency cores and GPU lit by temperature, next to the list of every sensor" width="100%">
+
+The storage map never makes macOS pop up permission dialogs. Folders macOS guards
+(Desktop, Documents, Downloads, Photos, other apps' data) are skipped and marked as
+locked, unless you give Nova Stats Full Disk Access.
 
 <img src="docs/battery.png" alt="The Battery tab: 22% and charging, 6 W for the whole Mac, health 100%, 54 charge cycles, the charger and a power chart" width="100%">
 
@@ -69,9 +78,13 @@ it start by itself when a game goes full screen.
   <img src="docs/report.png" alt="A session report: time played, average and peak CPU, GPU, power and temperatures, and a temperature chart" width="380">
 </p>
 
-**Shortcuts** work from any app: <kbd>⌃⌥N</kbd> opens or closes the dashboard,
+**Keyboard shortcuts** work from any app: <kbd>⌃⌥N</kbd> opens or closes the dashboard,
 <kbd>⌃⌥G</kbd> starts or stops game mode and <kbd>⌃⌥H</kbd> shows or hides its overlay.
 You can change all three in Settings.
+
+**Siri and Shortcuts** know Nova Stats too. Say "How hot is my Mac in Nova Stats" or
+"Check my Mac with Nova Stats", or use its actions in the Shortcuts app: the temperature,
+a one-line check of the whole Mac, game mode on and off, and the benchmark.
 
 **Alerts** tell you when the Mac runs hot, memory gets tight, the disk is almost full
 or the CPU has been busy for a minute. Each one at most every half hour.
@@ -85,10 +98,15 @@ Everything is optional and set up in **Settings**, a panel inside the dashboard
 
 ## Benchmark and stress test
 
-The **Tests** tab benchmarks the CPU (one core and all cores), the GPU, memory and the
-SSD, and keeps your past runs, marked on battery or plugged in, so you can compare them.
-The scores are on Nova Stats' own scale, so they're for comparing your own runs, not
-Geekbench numbers.
+The **Tests** tab benchmarks the CPU (one core and all cores), the GPU, AI matrix math,
+the video engine (4K HEVC encoding), memory and the SSD. Each test warms up first, runs
+several rounds and keeps the middle one, and shows how far apart the rounds were, so you
+know how much to trust the number. The full run takes about a minute.
+
+Your past runs are kept, marked on battery or plugged in. The history chart shows any
+score over time, and clicking an older run compares it with the latest one. The scores
+are on Nova Stats' own scale, so they're for comparing your own runs, not Geekbench
+numbers.
 
 Its **stress tests** push the CPU, the GPU, both, the RAM, the SSD, or everything at once
 (the max power test) for 1, 5 or 10 minutes or until you stop. Live charts show the speed
@@ -100,7 +118,7 @@ Tests stop by themselves above 110°, under 20% battery or when the time is up. 
 test only reads, so it doesn't wear the SSD, and the RAM test never takes so much memory
 that macOS has to swap.
 
-<img src="docs/tests.png" alt="The Tests tab: benchmark scores for CPU, GPU, memory and SSD, the stress test picker, and charts of speed and temperature from the last stress test" width="100%">
+<img src="docs/tests.png" alt="The Tests tab: benchmark scores for CPU, GPU, AI, video, memory and SSD with how steady each one was, the history chart, the stress test picker, and charts from the last stress test" width="100%">
 
 ## Download
 
@@ -150,9 +168,15 @@ and in the app under Settings → About.
 - **Background work**: anything you can't see right now (a closed dashboard, a tab
   you're not on) is measured every 5 to 30 seconds instead of every second, so with
   only the menu bar it costs about 1–2% of one CPU core
-- **Benchmarks and stress tests**: integer and vector math on every core, a Metal
-  shader made of independent multiply-adds for the GPU, a parallel copy of big buffers
-  for memory, and reads and writes past the system cache (`F_NOCACHE`) for the SSD
+- **Benchmarks and stress tests**: three kinds of CPU work (integer math, vector math
+  and sorting, scored by their geometric mean), a Metal shader made of independent
+  multiply-adds for the GPU, `cblas_sgemm` from Accelerate on 2048×2048 matrices for AI
+  math, VideoToolbox's hardware HEVC encoder at 4K, a parallel copy of big buffers for
+  memory, and a 4 GB file written and read past the system cache (`F_NOCACHE`) for the SSD
+- **Storage map**: one pass over the home folder that adds every folder's size into its
+  parent, so moving around the result is instant. Without Full Disk Access it doesn't
+  open the folders macOS guards, because opening them is what shows the popups
+- **Siri and Shortcuts**: App Intents with App Shortcuts, so they work without setup
 - **Stars**: drawn with Metal, so the open dashboard costs about 7% of one CPU core. The shader compiles at launch, so the project builds
   without Xcode's separate Metal toolchain
 - **Widgets**: the app writes a small JSON file to `~/Library/Application Support/Nova Stats`

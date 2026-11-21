@@ -204,6 +204,24 @@
         <p>CPU, GPU, SSD and battery, plus every other sensor the chip has. In °C or °F.</p>
       </div>
     </div>
+    <div class="grid" style="margin-top:16px">
+      <div class="card">
+        <svg viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>
+        <h3>Chip heat map</h3>
+        <p>A 3D chip with every core sensor lit by its own temperature, so you can see which part of the chip is working hardest.</p>
+      </div>
+      <div class="card">
+        <svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M8 15h8"/></svg>
+        <h3>Storage map</h3>
+        <p>Which folders and files take the most space in your home folder. Click into any folder and show it in Finder. No permission popups.</p>
+      </div>
+      <div class="card">
+        <svg viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+        <h3>Siri and Shortcuts</h3>
+        <p>"How hot is my Mac in Nova Stats." Ask Siri, or use Nova Stats' actions in the Shortcuts app.</p>
+      </div>
+    </div>
+    <div class="shot" style="margin-top:16px"><img src="sensors.png" alt="The Sensors tab: the 3D chip heat map with performance cores, efficiency cores and GPU lit by temperature, next to the list of every sensor"></div>
     <div class="shot" style="margin-top:16px"><img src="battery.png" alt="The Battery tab: 22% and charging, 6 W for the whole Mac, health 100%, 54 charge cycles, the charger and a power chart"></div>
   </section>
 
@@ -233,7 +251,7 @@
     <div class="grid" style="margin-top:16px">
       <div class="card">
         <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="3"/><path d="M7 10h1M11 10h1M15 10h2M7 14h10"/></svg>
-        <h3>Shortcuts from anywhere</h3>
+        <h3>Keyboard shortcuts</h3>
         <p><code>⌃⌥N</code> opens the dashboard, <code>⌃⌥G</code> starts game mode and <code>⌃⌥H</code> hides its overlay, from any app. You can change all three.</p>
       </div>
       <div class="card">
@@ -251,13 +269,13 @@
 
   <section class="block" id="tests">
     <h2>Benchmark and stress test</h2>
-    <p class="lead">Score the CPU, GPU, memory and SSD, then push them to the limit and watch what heat does to a Mac. Tests stop by themselves above 110°, under 20% battery or when the time is up.</p>
-    <div class="shot" style="margin-top:0"><img src="tests.png" alt="The Tests tab: benchmark scores for CPU, GPU, memory and SSD, the stress test picker, and charts of speed and temperature from the last stress test"></div>
+    <p class="lead">Score the CPU, GPU, AI math, video engine, memory and SSD, then push them to the limit and watch what heat does to a Mac. Tests stop by themselves above 110°, under 20% battery or when the time is up.</p>
+    <div class="shot" style="margin-top:0"><img src="tests.png" alt="The Tests tab: benchmark scores for CPU, GPU, AI, video, memory and SSD with how steady each one was, the history chart, the stress test picker, and charts from the last stress test"></div>
     <div class="grid" style="margin-top:16px">
       <div class="card">
         <svg viewBox="0 0 24 24"><path d="M12 14l4-4M5.6 18.4a9 9 0 1 1 12.8 0"/></svg>
         <h3>Benchmark</h3>
-        <p>One core and all cores, GPU in TFLOPS, memory and SSD speed. Your past runs are kept, on battery or plugged in, so you can compare.</p>
+        <p>One core and all cores, GPU and AI matrix math in TFLOPS, 4K video encoding, memory and SSD speed. Each test runs several rounds and keeps the middle one. A history chart and a compare button show how your runs differ.</p>
       </div>
       <div class="card">
         <svg viewBox="0 0 24 24"><path d="M12 3c1 4 5 5 5 10a5 5 0 0 1-10 0c0-3 2-4 2-7 2 1 3 3 3 3"/></svg>
@@ -304,6 +322,9 @@
       <details><summary>Can a stress test damage my Mac?</summary><p>No. Apple Silicon protects itself: when it gets too hot, macOS slows it down, which is exactly what the test shows. Nova Stats also stops a test by itself above 110°, under 20% battery or when its time is up. The SSD test only reads, so it doesn't wear the SSD, and the RAM test never takes so much memory that macOS has to swap.</p></details>
       <details><summary>Why don't my scores match Geekbench or Cinebench?</summary><p>Every benchmark uses its own work and its own scale. Nova Stats' scores are for comparing your own runs: plugged in or on battery, before and after an update, or with another Mac running Nova Stats.</p></details>
       <details><summary>What is game mode?</summary><p>Turn it on from the menu bar or with ⌃⌥G, or let it start by itself when a game goes full screen. While it's on, an overlay shows your stats over the game and warns you if the Mac gets so hot that macOS slows it down. When you stop, you get a report: how long you played and the average and peak CPU, GPU, temperatures and power. macOS doesn't let other apps read a game's FPS, so that isn't shown.</p></details>
+      <details><summary>What does the ± next to a score mean?</summary><p>Each test runs several rounds and keeps the middle one. The ± is how far apart the rounds were. Under 1–2% means the score is solid. A bigger number means something else was busy, so close heavy apps and run it again.</p></details>
+      <details><summary>Why does the storage map say some folders are locked?</summary><p>macOS guards folders like Desktop, Documents, Downloads, Photos and other apps' data, and asks you first when an app wants to open them. So you never get a pile of popups, Nova Stats skips them. To include them, give it Full Disk Access: press Unlock in the storage map, or open System Settings → Privacy &amp; Security → Full Disk Access and turn on Nova Stats.</p></details>
+      <details><summary>Can I use Siri or Shortcuts?</summary><p>Yes. Say "How hot is my Mac in Nova Stats" or "Check my Mac with Nova Stats", or look for Nova Stats in the Shortcuts app. It has actions for the temperature, a quick check of the whole Mac, game mode on and off, and the benchmark.</p></details>
       <details><summary>Why do the widgets update only every few minutes?</summary><p>macOS decides how often widgets may refresh. For numbers that change every second, use the menu bar or game mode's overlay.</p></details>
       <details><summary>Why are some apps missing from the Apps list?</summary><p>Without an administrator password macOS only lets an app look at your own processes, not the system's. Everything you run yourself is there.</p></details>
       <details><summary>Why don't alerts show up?</summary><p>macOS needs your permission for notifications. Open System Settings, then Notifications, find Nova Stats and allow them. Settings → Alerts in the app has a button that takes you there.</p></details>
