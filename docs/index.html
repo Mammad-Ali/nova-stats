@@ -145,6 +145,7 @@
 <nav>
   <a class="brand" href="#top"><img src="icon.png" alt="">Nova Stats</a>
   <a class="link" href="#features">Features</a>
+  <a class="link" href="#tests">Tests</a>
   <a class="link" href="#install">Install</a>
   <a class="link" href="#questions">Questions</a>
   <a class="link" href="https://github.com/Mammad-Ali/nova-stats">GitHub</a>
@@ -248,6 +249,29 @@
     </div>
   </section>
 
+  <section class="block" id="tests">
+    <h2>Benchmark and stress test</h2>
+    <p class="lead">Score the CPU, GPU, memory and SSD, then push them to the limit and watch what heat does to a Mac. Tests stop by themselves above 110°, under 20% battery or when the time is up.</p>
+    <div class="shot" style="margin-top:0"><img src="tests.png" alt="The Tests tab: benchmark scores for CPU, GPU, memory and SSD, the stress test picker, and charts of speed and temperature from the last stress test"></div>
+    <div class="grid" style="margin-top:16px">
+      <div class="card">
+        <svg viewBox="0 0 24 24"><path d="M12 14l4-4M5.6 18.4a9 9 0 1 1 12.8 0"/></svg>
+        <h3>Benchmark</h3>
+        <p>One core and all cores, GPU in TFLOPS, memory and SSD speed. Your past runs are kept, on battery or plugged in, so you can compare.</p>
+      </div>
+      <div class="card">
+        <svg viewBox="0 0 24 24"><path d="M12 3c1 4 5 5 5 10a5 5 0 0 1-10 0c0-3 2-4 2-7 2 1 3 3 3 3"/></svg>
+        <h3>Stress test</h3>
+        <p>CPU, GPU, both, RAM, SSD or everything at once, with live charts of speed and temperature and a summary of how much the Mac slowed down.</p>
+      </div>
+      <div class="card">
+        <svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg>
+        <h3>Safe for your Mac</h3>
+        <p>The SSD test only reads, so it doesn't wear the SSD, and the RAM test never takes so much memory that macOS has to swap.</p>
+      </div>
+    </div>
+  </section>
+
   <section class="block" id="install">
     <h2>Install</h2>
     <p class="lead">Nova Stats isn't signed with a paid Apple developer account, so macOS asks you once to allow it.</p>
@@ -277,6 +301,8 @@
       <details><summary>Does it slow my Mac down?</summary><p>Barely. With the dashboard closed it uses about 1–2% of one CPU core: anything you can't see is measured less often. The open dashboard with moving stars uses about 7%; turn the stars off in Settings if you like.</p></details>
       <details><summary>Where do the temperatures come from?</summary><p>Straight from the chip's own sensors (the SMC and the system's temperature sensors), the same ones macOS uses to run the fans. The CPU number is the average of the core sensors.</p></details>
       <details><summary>Which Macs does it work on?</summary><p>Macs with Apple Silicon (M1 to M5) on macOS 15 or newer. On Intel Macs most numbers work, but some temperatures may be missing.</p></details>
+      <details><summary>Can a stress test damage my Mac?</summary><p>No. Apple Silicon protects itself: when it gets too hot, macOS slows it down, which is exactly what the test shows. Nova Stats also stops a test by itself above 110°, under 20% battery or when its time is up. The SSD test only reads, so it doesn't wear the SSD, and the RAM test never takes so much memory that macOS has to swap.</p></details>
+      <details><summary>Why don't my scores match Geekbench or Cinebench?</summary><p>Every benchmark uses its own work and its own scale. Nova Stats' scores are for comparing your own runs: plugged in or on battery, before and after an update, or with another Mac running Nova Stats.</p></details>
       <details><summary>What is game mode?</summary><p>Turn it on from the menu bar or with ⌃⌥G, or let it start by itself when a game goes full screen. While it's on, an overlay shows your stats over the game and warns you if the Mac gets so hot that macOS slows it down. When you stop, you get a report: how long you played and the average and peak CPU, GPU, temperatures and power. macOS doesn't let other apps read a game's FPS, so that isn't shown.</p></details>
       <details><summary>Why do the widgets update only every few minutes?</summary><p>macOS decides how often widgets may refresh. For numbers that change every second, use the menu bar or game mode's overlay.</p></details>
       <details><summary>Why are some apps missing from the Apps list?</summary><p>Without an administrator password macOS only lets an app look at your own processes, not the system's. Everything you run yourself is there.</p></details>

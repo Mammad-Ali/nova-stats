@@ -1,25 +1,24 @@
-Game mode, a lighter app in the background, and Settings inside the dashboard.
+Benchmarks and stress tests.
 
 **Install:** download `Nova-Stats.dmg`, open it and drag Nova Stats into Applications.
 The first time, macOS says it can't check the app, because it isn't signed with a paid
 Apple developer account. Open System Settings → Privacy & Security, scroll down and press
-**Open Anyway**. You only do this once. If you already have 1.0, just replace it.
+**Open Anyway**. You only do this once. If you already have Nova Stats, just replace it.
 
 What's new:
 
-- **Game mode.** An overlay with your stats sits on top of the game, even in full screen.
-  Turn it on from the menu bar or with ⌃⌥G, or let it start by itself when a game goes
-  full screen. ⌃⌥H hides the overlay for a moment.
-- **Overheat warning.** The overlay tells you when the Mac gets so hot that macOS starts
-  slowing it down.
-- **Session report.** When you stop, you see how long you played and the average and peak
-  CPU, GPU, temperatures and power, plus how long heat held the Mac back.
-- **Lighter in the background.** Anything you can't see is measured less often, so with
-  only the menu bar it now uses about 1–2% of one CPU core instead of about 4%, and less
-  memory.
-- **Settings inside the dashboard.** A compact panel (⌘,) instead of a separate window,
-  so it never turns into a tab in full screen.
+- **Tests tab.** Benchmark the CPU (one core and all cores), the GPU, memory and the SSD,
+  and compare with your past runs, marked on battery or plugged in.
+- **Stress tests.** Push the CPU, the GPU, both, the RAM, the SSD, or everything at once
+  (the max power test) for 1, 5 or 10 minutes or until you stop. Live charts show the speed
+  and the temperature, and the summary tells you the peak temperature and watts and how
+  much the Mac slowed down from heat.
+- **Buttons where you need them.** The CPU, GPU, Memory, Disk and Battery tabs can start
+  their own test, so you can watch the cores fill up right where they're shown.
+- **Safe by design.** Tests stop by themselves above 110°, under 20% battery or when the
+  time is up. The SSD test only reads, so it doesn't wear the SSD, and the RAM test never
+  takes so much memory that macOS has to swap.
 
-The overlay now only shows during game mode.
+Scores are on Nova Stats' own scale, for comparing your own runs.
 
 Needs macOS 15 or newer. Made for Apple Silicon.

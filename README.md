@@ -83,6 +83,25 @@ Everything is optional and set up in **Settings**, a panel inside the dashboard
   <img src="docs/settings.png" alt="The Settings panel inside the dashboard, on the Game mode section: start, start automatically, the overlay's corner, layout and stats" width="640">
 </p>
 
+## Benchmark and stress test
+
+The **Tests** tab benchmarks the CPU (one core and all cores), the GPU, memory and the
+SSD, and keeps your past runs, marked on battery or plugged in, so you can compare them.
+The scores are on Nova Stats' own scale, so they're for comparing your own runs, not
+Geekbench numbers.
+
+Its **stress tests** push the CPU, the GPU, both, the RAM, the SSD, or everything at once
+(the max power test) for 1, 5 or 10 minutes or until you stop. Live charts show the speed
+against the start and the temperature, so you can watch a fanless Mac slow down as it
+heats up. The CPU, GPU, Memory, Disk and Battery tabs have their own buttons for the
+same tests, so you can watch the cores fill up right where they're shown.
+
+Tests stop by themselves above 110°, under 20% battery or when the time is up. The SSD
+test only reads, so it doesn't wear the SSD, and the RAM test never takes so much memory
+that macOS has to swap.
+
+<img src="docs/tests.png" alt="The Tests tab: benchmark scores for CPU, GPU, memory and SSD, the stress test picker, and charts of speed and temperature from the last stress test" width="100%">
+
 ## Download
 
 Get **[Nova-Stats.dmg](https://github.com/Mammad-Ali/nova-stats/releases/latest/download/Nova-Stats.dmg)**,
@@ -131,6 +150,9 @@ and in the app under Settings → About.
 - **Background work**: anything you can't see right now (a closed dashboard, a tab
   you're not on) is measured every 5 to 30 seconds instead of every second, so with
   only the menu bar it costs about 1–2% of one CPU core
+- **Benchmarks and stress tests**: integer and vector math on every core, a Metal
+  shader made of independent multiply-adds for the GPU, a parallel copy of big buffers
+  for memory, and reads and writes past the system cache (`F_NOCACHE`) for the SSD
 - **Stars**: drawn with Metal, so the open dashboard costs about 7% of one CPU core. The shader compiles at launch, so the project builds
   without Xcode's separate Metal toolchain
 - **Widgets**: the app writes a small JSON file to `~/Library/Application Support/Nova Stats`
